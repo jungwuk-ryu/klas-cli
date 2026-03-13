@@ -24,17 +24,27 @@ Use this skill when a student or agent needs read-only KLAS information from the
 
 ## Auth guidance
 
+Install the CLI first when `klas` is not already available:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jungwuk-ryu/klas-cli/main/install.sh | bash
+```
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/jungwuk-ryu/klas-cli/main/install.ps1 | iex
+```
+
 Prefer reusable local auth session first:
 
 ```bash
-dart run bin/klas.dart auth login
+klas auth login
 ```
 
 For bot-driven login without shell `export`, use stdin JSON:
 
 ```bash
 printf '{"id":"<id>","password":"<password>"}' | \
-  dart run bin/klas.dart auth login --stdin-json --format json
+  klas auth login --stdin-json --format json
 ```
 
 Environment variables remain a fallback option:
@@ -56,78 +66,74 @@ Use `schema` to inspect the command contract at runtime before guessing flags or
 
 ## Execution rule
 
-These examples assume the current working directory is the repository root for this project.
+When `klas` is installed globally, the current working directory does not matter.
 
-If the agent is running elsewhere, execute from the repo root first:
-
-```bash
-cd /home/ubuntu/works/klas-cli
-```
+If you are using `dart run` from a checkout instead, run commands from that repository root.
 
 ## Common commands
 
 ### Check auth
 
 ```bash
-dart run bin/klas.dart --format json auth status
+klas --format json auth status
 ```
 
 ### Inspect a command contract
 
 ```bash
-dart run bin/klas.dart --format json schema tasks list
+klas --format json schema tasks list
 ```
 
 ### List courses
 
 ```bash
-dart run bin/klas.dart --format json courses list
-dart run bin/klas.dart --format json --fields course_id,title courses list
+klas --format json courses list
+klas --format json --fields course_id,title courses list
 ```
 
 ### Show one course
 
 ```bash
-dart run bin/klas.dart --format json courses show --course "CSE101"
+klas --format json courses show --course "CSE101"
 ```
 
 ### List tasks
 
 ```bash
-dart run bin/klas.dart --format json tasks list
+klas --format json tasks list
 ```
 
 ### Show one task
 
 ```bash
-dart run bin/klas.dart --format json tasks show 12 --course "CSE101"
+klas --format json tasks show 12 --course "CSE101"
 ```
 
 ### List notices
 
 ```bash
-dart run bin/klas.dart --format json notices list
+klas --format json notices list
 ```
 
 ### Filter notices or tasks to one course
 
 ```bash
-dart run bin/klas.dart --format json tasks list --course "CSE101"
-dart run bin/klas.dart --format json notices list --course "자료구조"
+klas --format json tasks list --course "CSE101"
+klas --format json notices list --course "자료구조"
 ```
 
 ### Validate locally before a read-only call
 
 ```bash
-dart run bin/klas.dart --format json --dry-run tasks show 12 --course "CSE101"
+klas --format json --dry-run tasks show 12 --course "CSE101"
 ```
 
 ### Schedule queries
 
 ```bash
-dart run bin/klas.dart --format json schedule today
-dart run bin/klas.dart --format json schedule week
-dart run bin/klas.dart --format json schedule next
+klas --format json schedule today
+klas --format json schedule week
+klas --format json schedule next
 ```
 
 ## Interpretation rules
