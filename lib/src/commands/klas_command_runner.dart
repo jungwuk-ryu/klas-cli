@@ -191,7 +191,7 @@ final class AuthLoginCommand extends KlasCommand<AuthLoginView> {
 
   @override
   String get description =>
-      'Authenticate with KLAS and create a reusable local auth session.';
+      'Authenticate with KLAS and create durable local reusable auth.';
 
   @override
   Future<CommandPayload<AuthLoginView>> load() {
@@ -280,7 +280,7 @@ final class AuthLogoutCommand extends KlasCommand<SimpleMessageView> {
 
   @override
   String get description =>
-      'Clear the reusable local auth session managed by this CLI.';
+      'Clear the durable local auth state managed by this CLI.';
 
   @override
   Future<CommandPayload<SimpleMessageView>> load() => service.logout();

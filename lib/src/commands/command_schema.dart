@@ -146,7 +146,7 @@ const Map<String, CommandContract> commandContracts = <String, CommandContract>{
   'auth login': CommandContract(
     path: 'auth login',
     description:
-        'Authenticate with KLAS and create a reusable local auth session.',
+        'Authenticate with KLAS and create durable local reusable auth.',
     supportsFields: true,
     outputFields: <String>[
       'authenticated',
@@ -182,7 +182,7 @@ const Map<String, CommandContract> commandContracts = <String, CommandContract>{
   ),
   'auth logout': CommandContract(
     path: 'auth logout',
-    description: 'Clear the reusable local auth session managed by this CLI.',
+    description: 'Clear the durable local auth state managed by this CLI.',
     supportsFields: true,
     outputFields: <String>['message', 'hint'],
     notes: <String>[
