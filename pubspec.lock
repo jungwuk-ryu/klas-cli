@@ -188,11 +188,10 @@ packages:
   klasflow:
     dependency: "direct main"
     description:
-      path: "."
-      ref: "1579404ff5f88e3a57839305ee489e0cad55836e"
-      resolved-ref: "1579404ff5f88e3a57839305ee489e0cad55836e"
-      url: "https://github.com/jungwuk-ryu/klas-flow.git"
-    source: git
+      name: klasflow
+      sha256: "74bc44e3f830712ab40d05547d84d9f138b4559f4a47a0de10e0ae16363d6488"
+      url: "https://pub.dev"
+    source: hosted
     version: "1.2.0"
   lints:
     dependency: "direct dev"

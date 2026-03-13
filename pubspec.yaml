@@ -2,7 +2,6 @@ name: klas_cli
 description: Agent-first Dart CLI for KLAS built on top of klasflow.
 version: 0.1.0
 repository: https://github.com/jungwuk-ryu/klas-cli
-publish_to: none
 
 environment:
   sdk: ^3.11.1
@@ -13,10 +12,7 @@ executables:
 dependencies:
   args: ^2.7.0
   http: ^1.5.0
-  klasflow:
-    git:
-      url: https://github.com/jungwuk-ryu/klas-flow.git
-      ref: 1579404ff5f88e3a57839305ee489e0cad55836e
+  klasflow: ^1.2.0
 
 dev_dependencies:
   lints: ^6.0.0
