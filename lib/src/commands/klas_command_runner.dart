@@ -516,6 +516,10 @@ final class TasksShowCommand extends KlasCommand<TaskView> {
       'Show one task by task number, optionally narrowed by course.';
 
   @override
+  String get invocation =>
+      '${runner!.executableName} tasks show <task_no> [arguments]';
+
+  @override
   void validateInputs() {
     final selector = argResults!['course'] as String?;
     if (selector != null) {

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:klas_cli/klas_cli.dart';
 import 'package:klas_cli/src/auth/terminal.dart';
@@ -113,6 +114,22 @@ void main() {
       payload['error']['message'],
       contains('Missing required option: --course'),
     );
+  });
+
+  test('tasks show help includes required positional argument', () async {
+    final terminal = FakeTerminal();
+
+    final output = await capturePrints(() async {
+      final exitCode = await runKlasCli(
+        <String>['help', 'tasks', 'show'],
+        terminal: terminal,
+        service: FakeKlasService(),
+      );
+
+      expect(exitCode, ExitCodes.success);
+    });
+
+    expect(output, contains('Usage: klas tasks show <task_no> [arguments]'));
   });
 
   test('schema command returns machine-readable command contract', () async {
@@ -307,6 +324,23 @@ final class FakeTerminal implements Terminal {
   void writeOut(String message) {
     outLines.add(message);
   }
+}
+
+Future<String> capturePrints(Future<void> Function() action) async {
+  final buffer = StringBuffer();
+
+  await runZoned(
+    () async {
+      await action();
+    },
+    zoneSpecification: ZoneSpecification(
+      print: (self, parent, zone, line) {
+        buffer.writeln(line);
+      },
+    ),
+  );
+
+  return buffer.toString();
 }
 
 typedef LoginHandler =
