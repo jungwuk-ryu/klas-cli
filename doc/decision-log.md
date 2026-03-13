@@ -37,17 +37,24 @@
 
 ## Session persistence scope
 
-- Chosen option: create a reusable local auth session managed by the CLI, with credentials held in a local in-memory daemon and only connection metadata written to disk.
-- Alternatives considered: storing raw passwords locally; inventing unsupported full session restore via `klasflow`; env-only auth.
-- Why this is better here: it gives cross-process reusable login without requiring shell `export`, while avoiding plaintext password persistence on disk.
-- Remaining risk: the reusable session lasts only while the local daemon is alive and is still trusted-user local state rather than a hardened secret-store integration.
+- Chosen option: keep the local reusable daemon session, but back it with durable encrypted credentials so the daemon can be recreated after reboot or local process loss.
+- Alternatives considered: daemon-only ephemeral reuse; env-only auth; plaintext password persistence.
+- Why this is better here: it preserves prompt-free UX across CLI invocations and machine restarts while avoiding plaintext credential storage on disk.
+- Remaining risk: cross-platform security quality still depends on local platform capability, so some environments may fall back to encrypted files rather than an OS credential store.
 
 ## Auth recovery evidence
 
-- Chosen option: verify daemon-backed reusable auth plus environment fallback for ordinary commands.
-- Alternatives considered: claiming opaque session restoration; relying only on environment variables.
-- Why this is better here: ordinary commands can reuse local auth state without shell exports, while environment variables remain available as a fallback path.
-- Remaining risk: the reusable daemon session is local-process infrastructure, not OS keychain integration.
+- Chosen option: verify durable credential-backed daemon restoration plus environment fallback for ordinary commands.
+- Alternatives considered: relying only on environment variables; requiring explicit re-login after every reboot.
+- Why this is better here: ordinary commands can silently restore reusable auth after daemon death or reboot while environment variables remain a fallback path.
+- Remaining risk: recovery still depends on local secure-storage availability and correct protection of local state directories.
+
+## Durable auth storage backend
+
+- Chosen option: store runtime session metadata separately from durable credentials, protect durable credentials with encrypted local files, and prefer OS-backed key protection when available.
+- Alternatives considered: platform-specific native helpers only; file-only plaintext storage; no persistent credential layer.
+- Why this is better here: this keeps the implementation inside the Dart CLI, survives reboot, avoids plaintext secrets, and still degrades gracefully on headless or minimal systems.
+- Remaining risk: macOS/Linux keychain tooling can vary by environment, so the encrypted-file fallback remains part of the supported compatibility story.
 
 ## Agent runtime introspection and response shaping
 

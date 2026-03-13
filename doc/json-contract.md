@@ -83,7 +83,8 @@ Error responses replace `data` with `null` and include an `error` object:
 
 - `auth login --stdin-json` reads one JSON object from stdin with `id` and `password` string fields.
 - The CLI may create a reusable local auth session for later invocations.
-- That reusable session stores sensitive credentials in memory, not in the documented JSON envelope.
+- Sensitive credentials are never included in the documented JSON envelope.
+- Durable local auth may be stored through an OS credential store or an encrypted local file, while runtime session metadata remains local CLI state.
 
 ## Privacy rules
 
