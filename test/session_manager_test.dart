@@ -8,7 +8,9 @@ void main() {
   test(
     'local auth session manager persists daemon-backed reusable session lifecycle',
     () async {
-      final tempDir = await Directory.systemTemp.createTemp('klas-cli-session-test-');
+      final tempDir = await Directory.systemTemp.createTemp(
+        'klas-cli-session-test-',
+      );
       addTearDown(() async {
         if (await tempDir.exists()) {
           await tempDir.delete(recursive: true);
@@ -20,14 +22,39 @@ void main() {
         daemonLauncher: (metadataFilePath) {
           return Process.start(
             Platform.resolvedExecutable,
-            <String>['run', 'bin/klas.dart', '__authd', '--metadata-file', metadataFilePath],
+            <String>[
+              'run',
+              'bin/klas.dart',
+              '__authd',
+              '--metadata-file',
+              metadataFilePath,
+            ],
             workingDirectory: Directory.current.path,
             mode: ProcessStartMode.detachedWithStdio,
           );
         },
       );
 
-      await manager.save(const SessionCredentials(id: 'agent-user', password: 'agent-pass'));
+      await manager.save(
+        const SessionCredentials(id: 'agent-user', password: 'agent-pass'),
+      );
+
+      if (!Platform.isWindows) {
+        final directoryMode = await Process.run('stat', <String>[
+          '-c',
+          '%a',
+          tempDir.path,
+        ]);
+        final fileMode = await Process.run('stat', <String>[
+          '-c',
+          '%a',
+          '${tempDir.path}/auth-session.json',
+        ]);
+        expect(directoryMode.exitCode, 0);
+        expect(fileMode.exitCode, 0);
+        expect((directoryMode.stdout as String).trim(), '700');
+        expect((fileMode.stdout as String).trim(), '600');
+      }
 
       expect(await manager.hasSession(), isTrue);
       final credentials = await manager.load();

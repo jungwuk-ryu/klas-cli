@@ -17,26 +17,29 @@ abstract interface class AuthSessionManager {
   Future<void> clear();
 }
 
-typedef SessionDaemonLauncher = Future<Process> Function(String metadataFilePath);
+typedef SessionDaemonLauncher =
+    Future<Process> Function(String metadataFilePath);
 
 final class LocalAuthSessionManager implements AuthSessionManager {
   LocalAuthSessionManager({
     Directory? stateDirectory,
     SessionDaemonLauncher? daemonLauncher,
-  })
-    : _stateDirectory =
-          stateDirectory ?? _defaultStateDirectory(),
-      _daemonLauncher = daemonLauncher ?? _defaultDaemonLauncher;
+  }) : _stateDirectory = stateDirectory ?? _defaultStateDirectory(),
+       _daemonLauncher = daemonLauncher ?? _defaultDaemonLauncher;
 
   final Directory _stateDirectory;
   final SessionDaemonLauncher _daemonLauncher;
 
   File get _metadataFile => File('${_stateDirectory.path}/auth-session.json');
 
+  static const _ownerOnlyDirectoryMode = '700';
+  static const _ownerOnlyFileMode = '600';
+
   @override
   Future<void> save(SessionCredentials credentials) async {
     await clear();
     await _stateDirectory.create(recursive: true);
+    await _ensureSecureDirectory();
     final process = await _daemonLauncher(_metadataFile.path);
 
     process.stdin.writeln(jsonEncode(credentials.toJson()));
@@ -122,6 +125,8 @@ final class LocalAuthSessionManager implements AuthSessionManager {
       return null;
     }
     try {
+      await _ensureSecureDirectory();
+      await _ensureSecureMetadataFile();
       return AuthSessionMetadata.decode(await _metadataFile.readAsString());
     } catch (_) {
       await _cleanupStaleSession();
@@ -132,6 +137,33 @@ final class LocalAuthSessionManager implements AuthSessionManager {
   Future<void> _cleanupStaleSession() async {
     if (await _metadataFile.exists()) {
       await _metadataFile.delete();
+    }
+  }
+
+  Future<void> _ensureSecureDirectory() async {
+    await _setOwnerOnlyPermissions(
+      _stateDirectory.path,
+      _ownerOnlyDirectoryMode,
+    );
+  }
+
+  Future<void> _ensureSecureMetadataFile() async {
+    await _setOwnerOnlyPermissions(_metadataFile.path, _ownerOnlyFileMode);
+  }
+
+  Future<void> _setOwnerOnlyPermissions(String path, String mode) async {
+    if (Platform.isWindows) {
+      return;
+    }
+    final result = await Process.run('chmod', <String>[mode, path]);
+    if (result.exitCode != 0) {
+      final hint = (result.stderr as String).trim();
+      throw CliException(
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to protect reusable auth session storage.',
+        exitCode: ExitCodes.software,
+        hint: hint.isEmpty ? null : hint,
+      );
     }
   }
 
@@ -146,7 +178,10 @@ final class LocalAuthSessionManager implements AuthSessionManager {
         method,
         Uri.parse('http://127.0.0.1:${metadata.port}$path'),
       );
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer ${metadata.token}');
+      request.headers.set(
+        HttpHeaders.authorizationHeader,
+        'Bearer ${metadata.token}',
+      );
       final response = await request.close();
       final body = await utf8.decodeStream(response);
       if (response.statusCode != HttpStatus.ok) {
@@ -163,6 +198,17 @@ final class LocalAuthSessionManager implements AuthSessionManager {
   }
 
   static Directory _defaultStateDirectory() {
+    if (Platform.isWindows) {
+      final localAppData = Platform.environment['LOCALAPPDATA'];
+      if (localAppData != null && localAppData.trim().isNotEmpty) {
+        return Directory('$localAppData\\klas-cli');
+      }
+      final appData = Platform.environment['APPDATA'];
+      if (appData != null && appData.trim().isNotEmpty) {
+        return Directory('$appData\\klas-cli');
+      }
+    }
+
     final runtime = Platform.environment['XDG_RUNTIME_DIR'];
     if (runtime != null && runtime.trim().isNotEmpty) {
       return Directory('$runtime/klas-cli');
@@ -175,7 +221,8 @@ final class LocalAuthSessionManager implements AuthSessionManager {
     if (home == null || home.trim().isEmpty) {
       throw const CliException(
         code: 'INTERNAL_ERROR',
-        message: 'Cannot determine a local state directory for auth session storage.',
+        message:
+            'Cannot determine a local state directory for auth session storage.',
         exitCode: ExitCodes.software,
       );
     }
@@ -193,7 +240,8 @@ final class LocalAuthSessionManager implements AuthSessionManager {
 
   static _DaemonCommand _daemonCommand(String metadataPath) {
     final resolvedExecutable = Platform.resolvedExecutable;
-    final isDartVm = resolvedExecutable.endsWith('/dart') ||
+    final isDartVm =
+        resolvedExecutable.endsWith('/dart') ||
         resolvedExecutable.endsWith('\\dart.exe');
     if (isDartVm) {
       return _DaemonCommand(
@@ -222,7 +270,8 @@ Future<int> runAuthSessionDaemon({required String metadataFilePath}) async {
   }
 
   final credentials = SessionCredentials.fromJson(
-    (jsonDecode(credentialsRaw) as Map<String, dynamic>).cast<String, Object?>(),
+    (jsonDecode(credentialsRaw) as Map<String, dynamic>)
+        .cast<String, Object?>(),
   );
   final token = _randomToken();
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -234,9 +283,11 @@ Future<int> runAuthSessionDaemon({required String metadataFilePath}) async {
     createdAt: DateTime.now().toIso8601String(),
   );
 
-    final metadataFile = File(metadataFilePath);
-    await metadataFile.parent.create(recursive: true);
-    await metadataFile.writeAsString(metadata.encode());
+  final metadataFile = File(metadataFilePath);
+  await metadataFile.parent.create(recursive: true);
+  await _setOwnerOnlyPermissions(metadataFile.parent.path, '700');
+  await metadataFile.writeAsString(metadata.encode());
+  await _setOwnerOnlyPermissions(metadataFile.path, '600');
 
   ProcessSignal.sigterm.watch().listen((_) async {
     await server.close(force: true);
@@ -256,26 +307,26 @@ Future<int> runAuthSessionDaemon({required String metadataFilePath}) async {
 
     final response = switch ('${request.method} ${request.uri.path}') {
       'GET /v1/status' => <String, Object?>{
-          'authenticated': true,
-          'created_at': metadata.createdAt,
-          'pid': metadata.pid,
-        },
+        'authenticated': true,
+        'created_at': metadata.createdAt,
+        'pid': metadata.pid,
+      },
       'GET /v1/credentials' => credentials.toJson(),
       'POST /v1/logout' => <String, Object?>{'ok': true},
       _ => null,
     };
 
-     if (response == null) {
-       request.response.statusCode = HttpStatus.notFound;
-       await request.response.close();
-       continue;
-     }
+    if (response == null) {
+      request.response.statusCode = HttpStatus.notFound;
+      await request.response.close();
+      continue;
+    }
 
-     request.response.headers.contentType = ContentType.json;
-     request.response.headers.set(HttpHeaders.cacheControlHeader, 'no-store');
-     request.response.headers.set(HttpHeaders.pragmaHeader, 'no-cache');
-     request.response.write(jsonEncode(response));
-     await request.response.close();
+    request.response.headers.contentType = ContentType.json;
+    request.response.headers.set(HttpHeaders.cacheControlHeader, 'no-store');
+    request.response.headers.set(HttpHeaders.pragmaHeader, 'no-cache');
+    request.response.write(jsonEncode(response));
+    await request.response.close();
 
     if (request.method == 'POST' && request.uri.path == '/v1/logout') {
       await server.close(force: true);
@@ -286,6 +337,17 @@ Future<int> runAuthSessionDaemon({required String metadataFilePath}) async {
     }
   }
   return ExitCodes.success;
+}
+
+Future<void> _setOwnerOnlyPermissions(String path, String mode) async {
+  if (Platform.isWindows) {
+    return;
+  }
+  final result = await Process.run('chmod', <String>[mode, path]);
+  if (result.exitCode != 0) {
+    stderr.writeln((result.stderr as String).trim());
+    exit(ExitCodes.software);
+  }
 }
 
 String _randomToken() {
