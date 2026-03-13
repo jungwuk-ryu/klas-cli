@@ -9,7 +9,7 @@
 - 언어: Dart
 - 패키지명: `klas_cli`
 - 실행 파일명: `klas`
-- 업스트림 SDK: 고정 git 의존성으로 연결된 `klasflow`
+- 업스트림 SDK: pub.dev로 배포된 `klasflow`
 - 범위: 읽기 중심, 에이전트 친화적 CLI
 
 ## 기본 명령어 트리
@@ -27,6 +27,7 @@ klas notices list [--course <course>]
 klas schedule today
 klas schedule week
 klas schedule next
+klas schema [command ...]
 ```
 
 ## 의도적으로 보류한 명령
@@ -43,7 +44,37 @@ klas schedule next
 
 ## 설치와 실행
 
-`klasflow`는 pub.dev에 배포되어 있지 않기 때문에 이 프로젝트는 고정된 git 의존성을 사용합니다.
+이 프로젝트는 pub.dev에 배포된 `klas_cli`를 one-line installer로 바로 설치할 수 있습니다.
+
+macOS / Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jungwuk-ryu/klas-cli/main/install.sh | bash
+```
+
+Windows PowerShell:
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/jungwuk-ryu/klas-cli/main/install.ps1 | iex
+```
+
+설치기는 다음을 수행합니다.
+
+- `dart`가 없거나 버전이 부족하면 사용자 로컬 경로에 Dart SDK를 bootstrap합니다.
+- `dart pub global activate klas_cli --overwrite`로 pub.dev 패키지를 설치합니다.
+- Windows PowerShell에서는 현재 세션에서 바로 `klas`를 실행할 수 있게 PATH를 구성하고, Unix 계열에서는 이후 셸도 사용할 수 있게 PATH를 저장합니다.
+- 설치가 끝나면 `klas auth login`을 바로 실행하고, 비대화형 세션이라면 정확한 다음 명령만 안내합니다.
+
+주의: `curl ... | bash` 형태의 Unix one-liner는 자식 셸에서 실행되므로, 설치 직후 부모 셸에서 plain `klas`가 바로 보이지 않을 수 있습니다. 이 경우 새 셸을 열거나 설치기가 안내한 `source` 명령을 실행하면 됩니다. 설치기 자체는 설치 확인과 로그인 handoff를 내부에서 바로 수행합니다.
+
+설치 후에는 다음처럼 확인할 수 있습니다.
+
+```bash
+klas --help
+klas auth status
+```
+
+저장소에서 직접 실행하려면 다음처럼 시작합니다.
 
 ```bash
 dart pub get
@@ -75,42 +106,39 @@ export KLAS_PASSWORD="your-password"
 설정 후에는 일반 명령을 바로 실행하면 됩니다.
 
 ```bash
-dart run bin/klas.dart courses list
-dart run bin/klas.dart --format json tasks list
+klas courses list
+klas --format json tasks list
 ```
 
 로컬 재사용 세션을 만들려면 다음처럼 로그인합니다.
 
 ```bash
-dart run bin/klas.dart auth login
-dart run bin/klas.dart auth status
+klas auth login
+klas auth status
 ```
 
-OpenClaw 같은 에이전트는 셸 `export` 없이 stdin JSON 입력을 사용할 수 있습니다.
+자동화 환경에서는 셸 `export` 없이 stdin JSON 입력을 사용할 수 있습니다.
 
 ```bash
 printf '{"id":"your-id","password":"your-password"}' | \
-  dart run bin/klas.dart auth login --stdin-json --format json
+  klas auth login --stdin-json --format json
 ```
 
-환경변수와 로컬 세션이 모두 없고 텍스트 모드 + 대화형 터미널에서 실행 중이면, 필요한 경우 `stderr`로 자격 증명 입력 프롬프트를 표시합니다.
-
-### 중요한 인증 제한
-
-이 CLI는 비밀번호를 로컬 디스크에 저장하지 않습니다. 대신 현재 사용자 세션 안에서만 살아 있는 로컬 인증 데몬에 자격 증명을 메모리로 유지하고, 디스크에는 연결용 메타데이터만 기록합니다. `klasflow`는 로그인 이후 같은 프로세스 안에서는 세션 자동 연장을 지원하지만, 프로세스 간에 그대로 재사용할 수 있는 안전한 공개 세션 복구 API는 제공하지 않기 때문에 이 재사용 계층은 CLI가 직접 관리합니다.
-
-즉, 현재 동작은 다음과 같습니다.
+현재 동작은 다음과 같습니다.
 
 - `auth login`은 자격 증명을 검증한 뒤 재사용 가능한 로컬 인증 세션을 만듭니다.
 - 이후 `auth status`와 일반 명령은 먼저 이 로컬 세션을 사용합니다.
 - 환경변수 `KLAS_ID`와 `KLAS_PASSWORD`는 로컬 세션이 없을 때 fallback으로 사용됩니다.
 - `auth logout`은 로컬 인증 세션을 지우지만, 셸 환경변수 자체를 제거하지는 않습니다.
+- CLI는 비밀번호를 JSON 출력에 포함하지 않으며, 재사용 가능한 인증 상태는 현재 사용자 로컬 환경 안에서만 관리합니다.
 
 검증된 인증 재사용 동작은 다음과 같습니다.
 
 - 일반 명령은 먼저 로컬 재사용 세션을 확인합니다.
 - 로컬 세션이 없으면 `KLAS_ID`와 `KLAS_PASSWORD`를 사용합니다.
-- 둘 다 없으면 대화형 프롬프트가 마지막 fallback입니다.
+- 둘 다 없으면 텍스트 모드 + 대화형 터미널에서만 프롬프트가 마지막 fallback입니다.
+
+`auth login`은 대화형 터미널이라면 프롬프트를 사용할 수 있지만, 자동화에서는 `--stdin-json` 또는 환경변수를 사용하는 편이 안전합니다.
 
 ## 출력 계약
 
@@ -119,7 +147,7 @@ printf '{"id":"your-id","password":"your-password"}' | \
 에이전트나 자동화에서는 `--format json`을 사용하세요.
 
 ```bash
-dart run bin/klas.dart --format json tasks list
+klas --format json tasks list
 ```
 
 JSON 모드 규칙:
@@ -127,20 +155,24 @@ JSON 모드 규칙:
 - `stdout`에는 구조화된 JSON만 출력됩니다.
 - 프롬프트, 경고, 진단 메시지는 `stderr`를 사용합니다.
 
-### Agent-safe runtime controls
+### Automation-friendly runtime controls
 
 에이전트용으로 다음 제어를 추가 제공합니다.
 
 - `klas schema [command ...]`: 런타임에 명령 계약, 옵션, 출력 필드를 JSON으로 조회
 - `--fields a,b,c`: JSON `data`에서 필요한 top-level 필드만 유지
-- `--dry-run`: 로컬 입력만 검증하고 KLAS 호출 없이 종료
+- `--dry-run`: `supports_dry_run: true`인 명령에서만 로컬 입력을 검증하고 KLAS 호출 없이 종료
+
+예외:
+
+- `schema`, `auth login`, `auth logout`은 `--dry-run`을 지원하지 않습니다.
 
 예시:
 
 ```bash
-dart run bin/klas.dart --format json schema tasks list
-dart run bin/klas.dart --format json --fields course_id,title courses list
-dart run bin/klas.dart --format json --dry-run tasks show 12 --course CSE101
+klas --format json schema tasks list
+klas --format json --fields course_id,title courses list
+klas --format json --dry-run tasks show 12 --course CSE101
 ```
 
 입력 하드닝 규칙:
@@ -148,6 +180,8 @@ dart run bin/klas.dart --format json --dry-run tasks show 12 --course CSE101
 - course selector는 제어문자, `?`, `#`, `%`를 포함할 수 없습니다.
 - stdin JSON 인증 값은 빈 문자열이나 제어문자를 허용하지 않습니다.
 - `--fields`는 소문자/숫자/밑줄로 된 top-level JSON 필드명만 허용합니다.
+
+또한 `tasks list`는 truthful v1 범위의 전체 과제 목록 명령입니다. 마감 임박 또는 overdue 전용 의미는 아직 별도 명령으로 정의하지 않습니다.
 
 ### 성공 응답 예시
 
@@ -182,7 +216,7 @@ dart run bin/klas.dart --format json --dry-run tasks show 12 --course CSE101
 }
 ```
 
-세부 JSON 계약은 `docs/json-contract.md`에 정리되어 있습니다.
+세부 JSON 계약은 `doc/json-contract.md`에 정리되어 있습니다.
 
 ## 종료 코드
 
@@ -206,7 +240,7 @@ dart run bin/klas.dart --format json --dry-run tasks show 12 --course CSE101
 
 - `schedule week`: 반복 수업 시간표 기준
 - `schedule today`: 오늘의 시간표 + 월간 일정 항목 결합
-- `schedule next`: 위 결합 뷰에서 가장 가까운 다음 일정 선택
+- `schedule next`: 시간표와 월간 일정 데이터를 함께 보고 다음 항목을 선택
 
 또한 `tasks list`, `notices list`처럼 과목 fan-out이 필요한 명령은 일부 과목 조회에 실패해도 전체를 실패시키는 대신 `warnings`와 함께 부분 결과를 반환할 수 있습니다.
 
@@ -218,18 +252,14 @@ dart run bin/klas.dart --format json --dry-run tasks show 12 --course CSE101
 dart analyze
 dart test
 dart run bin/klas.dart --help
+dart run bin/klas.dart auth --help
 dart run bin/klas.dart --format json schema tasks list
 dart run bin/klas.dart --format json --dry-run courses list
-dart run bin/klas.dart --format json tasks list --course 'CSE101?fields=name'
-dart run bin/klas.dart auth --help
-printf '{"id":"bad","password":"bad"}' | dart run bin/klas.dart auth login --stdin-json --format json
-dart run bin/klas.dart --format json auth status
-dart run bin/klas.dart --format json me profile
+dart run bin/klas.dart --format json --fields path,description schema tasks list
+dart run bin/klas.dart --format json --dry-run tasks show 12 --course CSE101
 ```
 
 ## 관련 문서
 
-- `docs/plan.md`
-- `docs/decision-log.md`
-- `docs/json-contract.md`
-- `.agents/skills/klas-student-cli/SKILL.md`
+- `doc/json-contract.md`
+- `CHANGELOG.md`
