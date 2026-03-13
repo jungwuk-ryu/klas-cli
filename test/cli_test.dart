@@ -82,6 +82,39 @@ void main() {
     expect(payload['error']['code'], 'USAGE_ERROR');
   });
 
+  test('courses show requires --course before service execution', () async {
+    final terminal = FakeTerminal();
+    var called = false;
+    final service = FakeKlasService(
+      showCourseHandler: (selector, {required allowPrompt}) async {
+        called = true;
+        return CommandPayload<CourseView>(
+          data: CourseView(
+            courseId: selector,
+            termId: '20261',
+            isDefault: false,
+          ),
+        );
+      },
+    );
+
+    final exitCode = await runKlasCli(
+      <String>['--format', 'json', 'courses', 'show'],
+      terminal: terminal,
+      service: service,
+    );
+
+    expect(exitCode, ExitCodes.usage);
+    expect(called, isFalse);
+    final payload =
+        jsonDecode(terminal.outLines.single) as Map<String, dynamic>;
+    expect(payload['error']['code'], 'USAGE_ERROR');
+    expect(
+      payload['error']['message'],
+      contains('Missing required option: --course'),
+    );
+  });
+
   test('schema command returns machine-readable command contract', () async {
     final terminal = FakeTerminal();
 
@@ -287,6 +320,11 @@ typedef ListCoursesHandler =
     Future<CommandPayload<List<CourseView>>> Function({
       required bool allowPrompt,
     });
+typedef ShowCourseHandler =
+    Future<CommandPayload<CourseView>> Function(
+      String selector, {
+      required bool allowPrompt,
+    });
 typedef AuthStatusHandler = Future<CommandPayload<AuthStatusView>> Function();
 typedef ListTasksHandler =
     Future<CommandPayload<List<TaskView>>> Function({
@@ -300,6 +338,7 @@ final class FakeKlasService implements KlasService {
     this.authStatusHandler,
     this.profileHandler,
     this.listCoursesHandler,
+    this.showCourseHandler,
     this.listTasksHandler,
   });
 
@@ -307,6 +346,7 @@ final class FakeKlasService implements KlasService {
   final AuthStatusHandler? authStatusHandler;
   final ProfileHandler? profileHandler;
   final ListCoursesHandler? listCoursesHandler;
+  final ShowCourseHandler? showCourseHandler;
   final ListTasksHandler? listTasksHandler;
 
   @override
@@ -412,9 +452,14 @@ final class FakeKlasService implements KlasService {
     String selector, {
     required bool allowPrompt,
   }) async {
-    return CommandPayload<CourseView>(
-      data: CourseView(courseId: selector, termId: '20261', isDefault: false),
-    );
+    return showCourseHandler?.call(selector, allowPrompt: allowPrompt) ??
+        CommandPayload<CourseView>(
+          data: CourseView(
+            courseId: selector,
+            termId: '20261',
+            isDefault: false,
+          ),
+        );
   }
 
   @override

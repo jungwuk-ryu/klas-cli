@@ -390,7 +390,6 @@ final class CoursesShowCommand extends KlasCommand<CourseView> {
     argParser.addOption(
       'course',
       help: 'Exact course id or exact course title.',
-      mandatory: true,
     );
   }
 
@@ -402,7 +401,16 @@ final class CoursesShowCommand extends KlasCommand<CourseView> {
 
   @override
   void validateInputs() {
-    validateCourseSelector(argResults!['course'] as String);
+    final selector = argResults!['course'] as String?;
+    if (selector == null) {
+      throw const CliException(
+        code: 'USAGE_ERROR',
+        message: 'Missing required option: --course',
+        exitCode: ExitCodes.usage,
+        hint: 'Example: klas courses show --course CSE101',
+      );
+    }
+    validateCourseSelector(selector);
   }
 
   @override
