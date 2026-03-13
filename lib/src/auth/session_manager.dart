@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'credential_store.dart';
 import '../errors/cli_errors.dart';
 import '../models/cli_models.dart';
 import 'session_metadata.dart';
@@ -23,27 +24,117 @@ typedef SessionDaemonLauncher =
 final class LocalAuthSessionManager implements AuthSessionManager {
   LocalAuthSessionManager({
     Directory? stateDirectory,
+    Directory? runtimeDirectory,
+    Directory? persistentDirectory,
+    CredentialStore? credentialStore,
     SessionDaemonLauncher? daemonLauncher,
-  }) : _stateDirectory = stateDirectory ?? _defaultStateDirectory(),
+  }) : _runtimeDirectory =
+           runtimeDirectory ?? stateDirectory ?? _defaultRuntimeDirectory(),
+       _persistentDirectory =
+           persistentDirectory ??
+           stateDirectory ??
+           _defaultPersistentDirectory(),
+       _credentialStore =
+           credentialStore ??
+           PersistentCredentialStore(
+             stateDirectory:
+                 persistentDirectory ??
+                 stateDirectory ??
+                 _defaultPersistentDirectory(),
+           ),
        _daemonLauncher = daemonLauncher ?? _defaultDaemonLauncher;
 
-  final Directory _stateDirectory;
+  final Directory _runtimeDirectory;
+  final Directory _persistentDirectory;
+  final CredentialStore _credentialStore;
   final SessionDaemonLauncher _daemonLauncher;
 
-  File get _metadataFile => File('${_stateDirectory.path}/auth-session.json');
+  File get _metadataFile => File('${_runtimeDirectory.path}/auth-session.json');
+  Directory get _lockDirectory =>
+      Directory('${_persistentDirectory.path}/auth-session.lock');
 
   static const _ownerOnlyDirectoryMode = '700';
   static const _ownerOnlyFileMode = '600';
 
   @override
   Future<void> save(SessionCredentials credentials) async {
-    await clear();
-    await _stateDirectory.create(recursive: true);
-    await _ensureSecureDirectory();
+    await _withLock(() async {
+      await _clearRuntimeSession();
+      await _credentialStore.clear();
+      await _credentialStore.save(credentials);
+
+      try {
+        await _runtimeDirectory.create(recursive: true);
+        await _ensureSecureDirectory();
+        await _launchDaemon(credentials);
+      } catch (error) {
+        await _credentialStore.clear();
+        rethrow;
+      }
+    });
+  }
+
+  @override
+  Future<SessionCredentials?> load() async {
+    final liveCredentials = await _loadLiveCredentials();
+    if (liveCredentials != null) {
+      return liveCredentials;
+    }
+
+    return _withLock(() async {
+      final retryCredentials = await _loadLiveCredentials();
+      if (retryCredentials != null) {
+        return retryCredentials;
+      }
+
+      final durableCredentials = await _credentialStore.load();
+      if (durableCredentials == null) {
+        return null;
+      }
+
+      await _runtimeDirectory.create(recursive: true);
+      await _ensureSecureDirectory();
+      await _launchDaemon(durableCredentials);
+      return durableCredentials;
+    });
+  }
+
+  @override
+  Future<bool> hasSession() async {
+    final metadata = await _readMetadata();
+    if (metadata != null) {
+      try {
+        await _request(metadata, method: 'GET', path: '/v1/status');
+        return true;
+      } catch (_) {
+        await _cleanupStaleSession();
+      }
+    }
+    return _credentialStore.hasCredentials();
+  }
+
+  @override
+  Future<void> clear() async {
+    await _withLock(() async {
+      await _clearRuntimeSession();
+      await _credentialStore.clear();
+    });
+  }
+
+  Future<void> _launchDaemon(SessionCredentials credentials) async {
     final process = await _daemonLauncher(_metadataFile.path);
 
-    process.stdin.writeln(jsonEncode(credentials.toJson()));
-    await process.stdin.close();
+    try {
+      process.stdin.writeln(jsonEncode(credentials.toJson()));
+      await process.stdin.close();
+    } on SocketException catch (error) {
+      throw CliException(
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to start reusable auth session.',
+        exitCode: ExitCodes.software,
+        hint: error.message,
+      );
+    }
 
     final ready = await _waitForMetadata();
     if (ready == null) {
@@ -57,8 +148,7 @@ final class LocalAuthSessionManager implements AuthSessionManager {
     }
   }
 
-  @override
-  Future<SessionCredentials?> load() async {
+  Future<SessionCredentials?> _loadLiveCredentials() async {
     final metadata = await _readMetadata();
     if (metadata == null) {
       return null;
@@ -76,23 +166,7 @@ final class LocalAuthSessionManager implements AuthSessionManager {
     }
   }
 
-  @override
-  Future<bool> hasSession() async {
-    final metadata = await _readMetadata();
-    if (metadata == null) {
-      return false;
-    }
-    try {
-      await _request(metadata, method: 'GET', path: '/v1/status');
-      return true;
-    } catch (_) {
-      await _cleanupStaleSession();
-      return false;
-    }
-  }
-
-  @override
-  Future<void> clear() async {
+  Future<void> _clearRuntimeSession() async {
     final metadata = await _readMetadata();
     if (metadata != null) {
       try {
@@ -142,7 +216,7 @@ final class LocalAuthSessionManager implements AuthSessionManager {
 
   Future<void> _ensureSecureDirectory() async {
     await _setOwnerOnlyPermissions(
-      _stateDirectory.path,
+      _runtimeDirectory.path,
       _ownerOnlyDirectoryMode,
     );
   }
@@ -197,7 +271,7 @@ final class LocalAuthSessionManager implements AuthSessionManager {
     }
   }
 
-  static Directory _defaultStateDirectory() {
+  static Directory _defaultRuntimeDirectory() {
     if (Platform.isWindows) {
       final localAppData = Platform.environment['LOCALAPPDATA'];
       if (localAppData != null && localAppData.trim().isNotEmpty) {
@@ -213,6 +287,21 @@ final class LocalAuthSessionManager implements AuthSessionManager {
     if (runtime != null && runtime.trim().isNotEmpty) {
       return Directory('$runtime/klas-cli');
     }
+    return _defaultPersistentDirectory();
+  }
+
+  static Directory _defaultPersistentDirectory() {
+    if (Platform.isWindows) {
+      final localAppData = Platform.environment['LOCALAPPDATA'];
+      if (localAppData != null && localAppData.trim().isNotEmpty) {
+        return Directory('$localAppData\\klas-cli');
+      }
+      final appData = Platform.environment['APPDATA'];
+      if (appData != null && appData.trim().isNotEmpty) {
+        return Directory('$appData\\klas-cli');
+      }
+    }
+
     final stateHome = Platform.environment['XDG_STATE_HOME'];
     if (stateHome != null && stateHome.trim().isNotEmpty) {
       return Directory('$stateHome/klas-cli');
@@ -260,6 +349,34 @@ final class LocalAuthSessionManager implements AuthSessionManager {
       arguments: <String>['__authd', '--metadata-file', metadataPath],
     );
   }
+
+  Future<T> _withLock<T>(Future<T> Function() action) async {
+    await _persistentDirectory.create(recursive: true);
+    for (var attempt = 0; attempt < 50; attempt++) {
+      try {
+        await _lockDirectory.create();
+        break;
+      } on PathExistsException {
+        if (attempt == 49) {
+          throw const CliException(
+            code: 'INTERNAL_ERROR',
+            message:
+                'Timed out waiting for exclusive access to local auth storage.',
+            exitCode: ExitCodes.software,
+          );
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+    }
+
+    try {
+      return await action();
+    } finally {
+      if (await _lockDirectory.exists()) {
+        await _lockDirectory.delete();
+      }
+    }
+  }
 }
 
 Future<int> runAuthSessionDaemon({required String metadataFilePath}) async {
@@ -286,7 +403,10 @@ Future<int> runAuthSessionDaemon({required String metadataFilePath}) async {
   final metadataFile = File(metadataFilePath);
   await metadataFile.parent.create(recursive: true);
   await _setOwnerOnlyPermissions(metadataFile.parent.path, '700');
-  await metadataFile.writeAsString(metadata.encode());
+  final tempFile = File('${metadataFile.path}.tmp.$pid');
+  await tempFile.writeAsString(metadata.encode());
+  await _setOwnerOnlyPermissions(tempFile.path, '600');
+  await tempFile.rename(metadataFile.path);
   await _setOwnerOnlyPermissions(metadataFile.path, '600');
 
   ProcessSignal.sigterm.watch().listen((_) async {
