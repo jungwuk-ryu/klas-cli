@@ -2,10 +2,10 @@
 
 ## Dependency strategy for `klasflow`
 
-- Chosen option: `git` dependency pinned to the upstream repository.
-- Alternatives considered: local `path` dependency; vendoring/copying upstream code.
-- Why this is better here: this repo is standalone and currently does not include a sibling `klasflow` checkout, while upstream explicitly supports git usage and is not published on pub.dev.
-- Remaining risk: upstream `master` can change; pinning should use a specific commit rather than a floating branch when implementation starts.
+- Chosen option: hosted pub.dev dependency on `klasflow`.
+- Alternatives considered: local `path` dependency; git pinning to the upstream repository; vendoring/copying upstream code.
+- Why this is better here: the package is now published on pub.dev, so hosted versioning gives this standalone CLI a simpler install path and aligns dependency resolution with semantic versions instead of repository commits.
+- Remaining risk: upstream public releases can still change behavior across versions, so CLI verification should stay pinned to the published version range and be revalidated when bumping major or minor versions.
 
 ## External CLI contract boundary
 
@@ -62,3 +62,17 @@
 - Alternatives considered: permissive passthrough with downstream escaping only; broad regex lockdown for all identifiers.
 - Why this is better here: this CLI already uses exact-match selectors, so blocking embedded query fragments and pre-encoded values directly addresses likely agent hallucination patterns without breaking truthful human inputs like Korean course titles.
 - Remaining risk: hardening is currently focused on existing selector/auth entry points rather than hypothetical future commands.
+
+## One-line installer strategy
+
+- Chosen option: ship standalone `install.sh` and `install.ps1` scripts that bootstrap a user-local Dart SDK only when needed, then install `klas_cli` from pub.dev with `dart pub global activate klas_cli --overwrite`.
+- Alternatives considered: requiring a preinstalled Dart SDK; requiring Homebrew/apt/Chocolatey as the main path; cloning the repository and building locally.
+- Why this is better here: the package is already published on pub.dev, while the product requirement is a one-line installer that works even on machines without Dart.
+- Remaining risk: the installer pins a tested Dart SDK version, so the scripts must stay aligned with future SDK floor changes in `pubspec.yaml`.
+
+## Post-install login handoff
+
+- Chosen option: verify `klas --help` and then run `klas auth login` immediately when interactive input is available, while printing the exact next command in non-interactive contexts.
+- Alternatives considered: stopping after installation; forcing environment-variable login only; adding an installer-only command inside the CLI.
+- Why this is better here: it satisfies the request to continue into login without changing the CLI command surface, and it handles the `curl ... | bash` stdin redirection case truthfully.
+- Remaining risk: interactive login still depends on a real terminal or pre-supplied `KLAS_ID` and `KLAS_PASSWORD`.

@@ -140,7 +140,7 @@ A good default structure is:
 - `lib/src/output/` — text renderers and JSON envelope serializers
 - `lib/src/errors/` — error mapping and exit code policy
 - `test/` — unit and integration tests
-- `docs/` — contract docs, decision log, usage guides
+- `doc/` — contract docs, decision log, usage guides
 - `.agents/skills/` or `.opencode/skills/` — project-local agent skills
 
 Do not let raw upstream SDK objects leak directly into the external CLI contract.
@@ -164,7 +164,7 @@ A narrower truthful `progress` command is better than a misleading full score.
 
 The user wants careful, self-critical work.
 Do not rush from requirements to implementation.
-For each major design choice, capture in `docs/decision-log.md`:
+For each major design choice, capture in `doc/decision-log.md`:
 
 - chosen option
 - alternative options considered

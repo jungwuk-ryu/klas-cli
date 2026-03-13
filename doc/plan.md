@@ -7,14 +7,14 @@ Build a production-ready Dart CLI on top of `klasflow` that is safe for human st
 ## Evidence Snapshot
 
 - Local repo is greenfield: only `AGENTS.md` and `LICENSE` exist.
-- Upstream `klasflow` is unpublished to pub.dev and documents `path` or `git` integration.
+- Upstream `klasflow` is published on pub.dev and can be consumed as a hosted dependency.
 - Verified upstream high-level APIs exist for login, session status, profile, personal info, courses, tasks, notices, timetable, monthly schedule, files, and downloads.
 - Verified upstream does not expose a dedicated public `progress` CLI-ready API; only lower-level learning status/progress records are available.
 - Upstream auto-renews only within a running process when credentials are cached in memory, so CLI disk-backed session handling is still needed.
 
 ## In Scope
 
-- Initialize a standalone Dart CLI package with `bin/`, `lib/`, `test/`, and `docs/`.
+- Initialize a standalone Dart CLI package with `bin/`, `lib/`, `test/`, and `doc/`.
 - Add a thin adapter layer over `klasflow` public APIs.
 - Implement auth/session management suitable for CLI usage.
 - Implement text and JSON output contracts with structured errors and exit codes.
@@ -45,12 +45,14 @@ Build a production-ready Dart CLI on top of `klasflow` that is safe for human st
 4. Add normalized domain models and services for profile, courses, tasks, notices, schedule, files, and any truthful progress view.
 5. Add automated tests for parsing, output contracts, auth behavior, and core happy paths.
 6. Update README, docs, and agent skill to match shipped behavior.
-7. Run analyze, tests, build, and manual CLI QA before final Oracle verification.
+7. Add one-line installer scripts for Unix and Windows that bootstrap Dart when missing, activate the pub.dev package, and hand off to `klas auth login`.
+8. Run analyze, tests, build, and manual CLI QA before final Oracle verification.
 
 ## Validation Targets
 
 - `dart analyze`
 - `dart test`
+- `bash install.sh` in a clean environment without `dart` on `PATH`
 - `dart run bin/klas.dart --help`
 - Representative text/json command runs for shipped commands
 
