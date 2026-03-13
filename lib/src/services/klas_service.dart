@@ -112,83 +112,60 @@ final class KlasflowService implements KlasService {
 
   @override
   Future<CommandPayload<AuthStatusView>> authStatus() async {
-    final credentials = await _sessionCredentials();
-    if (credentials == null) {
-      final envCredentials = _envCredentials();
-      if (envCredentials != null) {
-        try {
-          return await _withCredentials(envCredentials, (
-            client,
-            _,
-            source,
-          ) async {
-            return CommandPayload<AuthStatusView>(
-              data: AuthStatusView(
-                authenticated: true,
-                reusable: true,
-                credentialSource: source.value,
-                checkedAt: _nowIso(),
-                interactiveAvailable: _terminal.canPrompt,
-              ),
-            );
-          });
-        } on InvalidCredentialsException {
-          return CommandPayload<AuthStatusView>(
-            data: AuthStatusView(
-              authenticated: false,
-              reusable: true,
-              credentialSource: CredentialSource.env.value,
-              checkedAt: _nowIso(),
-              interactiveAvailable: _terminal.canPrompt,
-              hint:
-                  'Environment credentials are present but were rejected by KLAS.',
-            ),
-          );
-        }
-      }
-
+    final sessionCredentials = await _sessionCredentials();
+    final sessionHint = sessionCredentials == null
+        ? null
+        : await _validateCredentialsForStatus(sessionCredentials);
+    if (sessionHint == null && sessionCredentials != null) {
       return CommandPayload<AuthStatusView>(
         data: AuthStatusView(
-          authenticated: false,
-          reusable: false,
-          credentialSource: CredentialSource.none.value,
+          authenticated: true,
+          reusable: true,
+          credentialSource: sessionCredentials.source.value,
           checkedAt: _nowIso(),
           interactiveAvailable: _terminal.canPrompt,
-          hint:
-              'No reusable auth session is available. Run `klas auth login` or set KLAS_ID and KLAS_PASSWORD.',
         ),
       );
     }
 
-    try {
-      return await _withCredentials(credentials, (client, _, source) async {
+    final envCredentials = _envCredentials();
+    if (envCredentials != null) {
+      final envHint = await _validateCredentialsForStatus(envCredentials);
+      if (envHint == null) {
         return CommandPayload<AuthStatusView>(
           data: AuthStatusView(
             authenticated: true,
             reusable: true,
-            credentialSource: source.value,
+            credentialSource: envCredentials.source.value,
             checkedAt: _nowIso(),
             interactiveAvailable: _terminal.canPrompt,
           ),
         );
-      });
-    } on InvalidCredentialsException {
-      if (credentials.source == CredentialSource.session) {
-        await _sessionManager.clear();
       }
       return CommandPayload<AuthStatusView>(
         data: AuthStatusView(
           authenticated: false,
           reusable: true,
-          credentialSource: credentials.source.value,
+          credentialSource: CredentialSource.env.value,
           checkedAt: _nowIso(),
           interactiveAvailable: _terminal.canPrompt,
-          hint: credentials.source == CredentialSource.session
-              ? 'The stored local auth session is no longer valid and was cleared.'
-              : 'Environment credentials are present but were rejected by KLAS.',
+          hint: envHint,
         ),
       );
     }
+
+    return CommandPayload<AuthStatusView>(
+      data: AuthStatusView(
+        authenticated: false,
+        reusable: false,
+        credentialSource: CredentialSource.none.value,
+        checkedAt: _nowIso(),
+        interactiveAvailable: _terminal.canPrompt,
+        hint:
+            sessionHint ??
+            'No reusable local auth is available. Run `klas auth login` or set KLAS_ID and KLAS_PASSWORD.',
+      ),
+    );
   }
 
   @override
@@ -196,7 +173,7 @@ final class KlasflowService implements KlasService {
     await _sessionManager.clear();
     return const CommandPayload<SimpleMessageView>(
       data: SimpleMessageView(
-        message: 'Cleared the local reusable auth session managed by this CLI.',
+        message: 'Cleared the durable local auth state managed by this CLI.',
         hint:
             'If you also configured KLAS_ID and KLAS_PASSWORD in your shell, remove them there to prevent automatic fallback.',
       ),
@@ -585,7 +562,20 @@ final class KlasflowService implements KlasService {
     action,
   }) async {
     final credentials = await _resolveCredentials(allowPrompt: allowPrompt);
-    return _withCredentials(credentials, action);
+    try {
+      return await _withCredentials(credentials, action);
+    } on Object catch (error) {
+      if (!_isCredentialFailure(error) ||
+          credentials.source != CredentialSource.session) {
+        rethrow;
+      }
+      await _sessionManager.clear();
+      final fallbackCredentials = await _resolveCredentials(
+        allowPrompt: allowPrompt,
+        useSession: false,
+      );
+      return _withCredentials(fallbackCredentials, action);
+    }
   }
 
   Future<T> _withCredentials<T>(
@@ -707,7 +697,13 @@ final class KlasflowService implements KlasService {
   }
 
   Future<_ResolvedCredentials?> _sessionCredentials() async {
-    final credentials = await _sessionManager.load();
+    SessionCredentials? credentials;
+    try {
+      credentials = await _sessionManager.load();
+    } catch (_) {
+      await _sessionManager.clear();
+      return null;
+    }
     if (credentials == null) {
       return null;
     }
@@ -719,6 +715,29 @@ final class KlasflowService implements KlasService {
       ),
       source: CredentialSource.session,
     );
+  }
+
+  Future<String?> _validateCredentialsForStatus(
+    _ResolvedCredentials credentials,
+  ) async {
+    try {
+      await _withCredentials(credentials, (client, _, _) async => null);
+      return null;
+    } on Object catch (error) {
+      if (!_isCredentialFailure(error)) {
+        rethrow;
+      }
+      if (credentials.source == CredentialSource.session) {
+        await _sessionManager.clear();
+        return 'The stored local auth session is no longer valid and was cleared.';
+      }
+      return 'Environment credentials are present but were rejected by KLAS.';
+    }
+  }
+
+  bool _isCredentialFailure(Object error) {
+    return error is InvalidCredentialsException ||
+        error is SessionExpiredException;
   }
 
   _ResolvedCredentials? _envCredentials() {

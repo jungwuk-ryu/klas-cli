@@ -16,143 +16,152 @@ void main() {
       '84a79b7654f0cc22a1346d8eaf3b70c9d11be9ee02baf7a90876efbda12340fd'
       'c7a8f9d01234abcdeffedcba98765432100112233445566778899aabbccddeeff';
 
-  test('auth status silently reuses environment credentials when available', () async {
-    final service = KlasflowService(
-      terminal: _SilentTerminal(),
-      sessionManager: _MemorySessionManager(),
-      environment: const <String, String>{
-        'KLAS_ID': 'test-user',
-        'KLAS_PASSWORD': 'test-password',
-      },
-      clientFactory: () => KlasClient(
-        config: KlasClientConfig(baseUri: Uri.parse('https://example.com')),
-        httpClient: MockClient((request) async {
-          switch (request.url.path) {
-            case '/usr/cmn/login/LoginSecurity.do':
-              return _jsonResponse({
-                'data': {
-                  'publicKeyModulus': modulus,
-                  'publicKeyExponent': '10001',
-                  'loginToken': 'nonce-1',
-                },
-              });
-            case '/usr/cmn/login/LoginCaptcha.do':
-              return http.Response('OK', 200);
-            case '/usr/cmn/login/LoginConfirm.do':
-              return _jsonResponse({'success': true});
-            case '/std/cmn/frame/KlasStop.do':
-              return _utf8TextResponse(
-                '<html><head><title>KLAS</title></head></html>',
-                200,
-                headers: {'content-type': 'text/html; charset=utf-8'},
-              );
-            case '/std/cmn/frame/YearhakgiAtnlcSbjectList.do':
-              return _jsonResponse({
-                'data': [
-                  {
-                    'selectYearhakgi': '20261',
-                    'selectSubj': 'CSE101',
-                    'selectChangeYn': 'N',
-                    'isDefault': true,
-                    'subjectName': '자료구조 - 김교수',
+  test(
+    'auth status silently reuses environment credentials when available',
+    () async {
+      final service = KlasflowService(
+        terminal: _SilentTerminal(),
+        sessionManager: _MemorySessionManager(),
+        environment: const <String, String>{
+          'KLAS_ID': 'test-user',
+          'KLAS_PASSWORD': 'test-password',
+        },
+        clientFactory: () => KlasClient(
+          config: KlasClientConfig(baseUri: Uri.parse('https://example.com')),
+          httpClient: MockClient((request) async {
+            switch (request.url.path) {
+              case '/usr/cmn/login/LoginSecurity.do':
+                return _jsonResponse({
+                  'data': {
+                    'publicKeyModulus': modulus,
+                    'publicKeyExponent': '10001',
+                    'loginToken': 'nonce-1',
                   },
-                ],
-              });
-            case '/api/v1/session/info':
-              return _jsonResponse({
-                'authenticated': true,
-                'userId': 'test-user',
-                'userName': '테스터',
-              });
-            default:
-              return http.Response('Not Found', 404);
-          }
-        }),
-      ),
-    );
+                });
+              case '/usr/cmn/login/LoginCaptcha.do':
+                return http.Response('OK', 200);
+              case '/usr/cmn/login/LoginConfirm.do':
+                return _jsonResponse({'success': true});
+              case '/std/cmn/frame/KlasStop.do':
+                return _utf8TextResponse(
+                  '<html><head><title>KLAS</title></head></html>',
+                  200,
+                  headers: {'content-type': 'text/html; charset=utf-8'},
+                );
+              case '/std/cmn/frame/YearhakgiAtnlcSbjectList.do':
+                return _jsonResponse({
+                  'data': [
+                    {
+                      'selectYearhakgi': '20261',
+                      'selectSubj': 'CSE101',
+                      'selectChangeYn': 'N',
+                      'isDefault': true,
+                      'subjectName': '자료구조 - 김교수',
+                    },
+                  ],
+                });
+              case '/api/v1/session/info':
+                return _jsonResponse({
+                  'authenticated': true,
+                  'userId': 'test-user',
+                  'userName': '테스터',
+                });
+              default:
+                return http.Response('Not Found', 404);
+            }
+          }),
+        ),
+      );
 
-    final payload = await service.authStatus();
+      final payload = await service.authStatus();
 
-    expect(payload.data.authenticated, isTrue);
-    expect(payload.data.reusable, isTrue);
-    expect(payload.data.credentialSource, 'env');
-  });
+      expect(payload.data.authenticated, isTrue);
+      expect(payload.data.reusable, isTrue);
+      expect(payload.data.credentialSource, 'env');
+    },
+  );
 
-  test('profile loads successfully from environment credentials without prompting', () async {
-    final terminal = _SilentTerminal();
-    final service = KlasflowService(
-      terminal: terminal,
-      sessionManager: _MemorySessionManager(),
-      environment: const <String, String>{
-        'KLAS_ID': 'test-user',
-        'KLAS_PASSWORD': 'test-password',
-      },
-      clientFactory: () => KlasClient(
-        config: KlasClientConfig(baseUri: Uri.parse('https://example.com')),
-        httpClient: MockClient((request) async {
-          switch (request.url.path) {
-            case '/usr/cmn/login/LoginSecurity.do':
-              return _jsonResponse({
-                'data': {
-                  'publicKeyModulus': modulus,
-                  'publicKeyExponent': '10001',
-                  'loginToken': 'nonce-1',
-                },
-              });
-            case '/usr/cmn/login/LoginCaptcha.do':
-              return http.Response('OK', 200);
-            case '/usr/cmn/login/LoginConfirm.do':
-              return _jsonResponse({'success': true});
-            case '/std/cmn/frame/KlasStop.do':
-              return _utf8TextResponse(
-                '<html><head><title>KLAS</title></head></html>',
-                200,
-                headers: {'content-type': 'text/html; charset=utf-8'},
-              );
-            case '/std/cmn/frame/YearhakgiAtnlcSbjectList.do':
-              return _jsonResponse({
-                'data': [
-                  {
-                    'selectYearhakgi': '20261',
-                    'selectSubj': 'CSE101',
-                    'selectChangeYn': 'N',
-                    'isDefault': true,
-                    'subjectName': '자료구조 - 김교수',
+  test(
+    'profile loads successfully from environment credentials without prompting',
+    () async {
+      final terminal = _SilentTerminal();
+      final service = KlasflowService(
+        terminal: terminal,
+        sessionManager: _MemorySessionManager(),
+        environment: const <String, String>{
+          'KLAS_ID': 'test-user',
+          'KLAS_PASSWORD': 'test-password',
+        },
+        clientFactory: () => KlasClient(
+          config: KlasClientConfig(baseUri: Uri.parse('https://example.com')),
+          httpClient: MockClient((request) async {
+            switch (request.url.path) {
+              case '/usr/cmn/login/LoginSecurity.do':
+                return _jsonResponse({
+                  'data': {
+                    'publicKeyModulus': modulus,
+                    'publicKeyExponent': '10001',
+                    'loginToken': 'nonce-1',
                   },
-                ],
-              });
-            case '/api/v1/session/info':
-              return _jsonResponse({
-                'authenticated': true,
-                'userId': 'test-user',
-                'userName': '테스터',
-              });
-            case '/std/ads/admst/IdModifySpvInfo.do':
-              return _jsonResponse({
-                'kname': '테스터',
-                'emailId': 'tester',
-                'emailHost': 'example.com',
-                'handPhoneno': '010-0000-0000',
-                'birthday': '2000-01-02',
-              });
-            default:
-              return http.Response('Not Found', 404);
-          }
-        }),
-      ),
-    );
+                });
+              case '/usr/cmn/login/LoginCaptcha.do':
+                return http.Response('OK', 200);
+              case '/usr/cmn/login/LoginConfirm.do':
+                return _jsonResponse({'success': true});
+              case '/std/cmn/frame/KlasStop.do':
+                return _utf8TextResponse(
+                  '<html><head><title>KLAS</title></head></html>',
+                  200,
+                  headers: {'content-type': 'text/html; charset=utf-8'},
+                );
+              case '/std/cmn/frame/YearhakgiAtnlcSbjectList.do':
+                return _jsonResponse({
+                  'data': [
+                    {
+                      'selectYearhakgi': '20261',
+                      'selectSubj': 'CSE101',
+                      'selectChangeYn': 'N',
+                      'isDefault': true,
+                      'subjectName': '자료구조 - 김교수',
+                    },
+                  ],
+                });
+              case '/api/v1/session/info':
+                return _jsonResponse({
+                  'authenticated': true,
+                  'userId': 'test-user',
+                  'userName': '테스터',
+                });
+              case '/std/ads/admst/IdModifySpvInfo.do':
+                return _jsonResponse({
+                  'kname': '테스터',
+                  'emailId': 'tester',
+                  'emailHost': 'example.com',
+                  'handPhoneno': '010-0000-0000',
+                  'birthday': '2000-01-02',
+                });
+              default:
+                return http.Response('Not Found', 404);
+            }
+          }),
+        ),
+      );
 
-    final payload = await service.profile(allowPrompt: false);
+      final payload = await service.profile(allowPrompt: false);
 
-    expect(payload.data.name, '테스터');
-    expect(payload.data.email, 'tester@example.com');
-    expect(payload.data.mobilePhone, '010-0000-0000');
-    expect(terminal.promptCount, 0);
-  });
+      expect(payload.data.name, '테스터');
+      expect(payload.data.email, 'tester@example.com');
+      expect(payload.data.mobilePhone, '010-0000-0000');
+      expect(terminal.promptCount, 0);
+    },
+  );
 
   test('auth status uses stored local session when available', () async {
     final sessionManager = _MemorySessionManager(
-      credentials: const SessionCredentials(id: 'test-user', password: 'test-password'),
+      credentials: const SessionCredentials(
+        id: 'test-user',
+        password: 'test-password',
+      ),
     );
     final service = KlasflowService(
       terminal: _SilentTerminal(),
@@ -175,7 +184,10 @@ void main() {
             case '/usr/cmn/login/LoginConfirm.do':
               return _jsonResponse({'success': true});
             case '/std/cmn/frame/KlasStop.do':
-              return _utf8TextResponse('<html><head><title>KLAS</title></head></html>', 200);
+              return _utf8TextResponse(
+                '<html><head><title>KLAS</title></head></html>',
+                200,
+              );
             case '/std/cmn/frame/YearhakgiAtnlcSbjectList.do':
               return _jsonResponse({
                 'data': [
@@ -189,7 +201,11 @@ void main() {
                 ],
               });
             case '/api/v1/session/info':
-              return _jsonResponse({'authenticated': true, 'userId': 'test-user', 'userName': '테스터'});
+              return _jsonResponse({
+                'authenticated': true,
+                'userId': 'test-user',
+                'userName': '테스터',
+              });
             default:
               return http.Response('Not Found', 404);
           }
@@ -203,136 +219,312 @@ void main() {
     expect(payload.data.credentialSource, 'session');
   });
 
-  test('login stores reusable local session after successful authentication', () async {
-    final sessionManager = _MemorySessionManager();
-    final service = KlasflowService(
-      terminal: _SilentTerminal(),
-      sessionManager: sessionManager,
-      environment: const <String, String>{
-        'KLAS_ID': 'test-user',
-        'KLAS_PASSWORD': 'test-password',
-      },
-      clientFactory: () => KlasClient(
-        config: KlasClientConfig(baseUri: Uri.parse('https://example.com')),
-        httpClient: MockClient((request) async {
-          switch (request.url.path) {
-            case '/usr/cmn/login/LoginSecurity.do':
-              return _jsonResponse({
-                'data': {
-                  'publicKeyModulus': modulus,
-                  'publicKeyExponent': '10001',
-                  'loginToken': 'nonce-1',
-                },
-              });
-            case '/usr/cmn/login/LoginCaptcha.do':
-              return http.Response('OK', 200);
-            case '/usr/cmn/login/LoginConfirm.do':
-              return _jsonResponse({'success': true});
-            case '/std/cmn/frame/KlasStop.do':
-              return _utf8TextResponse(
-                '<html><head><title>KLAS</title></head></html>',
-                200,
-                headers: {'content-type': 'text/html; charset=utf-8'},
-              );
-            case '/std/cmn/frame/YearhakgiAtnlcSbjectList.do':
-              return _jsonResponse({
-                'data': [
-                  {
-                    'selectYearhakgi': '20261',
-                    'selectSubj': 'CSE101',
-                    'selectChangeYn': 'N',
-                    'isDefault': true,
-                    'subjectName': '자료구조 - 김교수',
+  test(
+    'login stores reusable local session after successful authentication',
+    () async {
+      final sessionManager = _MemorySessionManager();
+      final service = KlasflowService(
+        terminal: _SilentTerminal(),
+        sessionManager: sessionManager,
+        environment: const <String, String>{
+          'KLAS_ID': 'test-user',
+          'KLAS_PASSWORD': 'test-password',
+        },
+        clientFactory: () => KlasClient(
+          config: KlasClientConfig(baseUri: Uri.parse('https://example.com')),
+          httpClient: MockClient((request) async {
+            switch (request.url.path) {
+              case '/usr/cmn/login/LoginSecurity.do':
+                return _jsonResponse({
+                  'data': {
+                    'publicKeyModulus': modulus,
+                    'publicKeyExponent': '10001',
+                    'loginToken': 'nonce-1',
                   },
-                ],
-              });
-            case '/api/v1/session/info':
-              return _jsonResponse({
-                'authenticated': true,
-                'userId': 'test-user',
-                'userName': '테스터',
-              });
-            default:
-              return http.Response('Not Found', 404);
-          }
-        }),
-      ),
-    );
-
-    final payload = await service.login(allowPrompt: false, useStdinJson: false);
-
-    expect(payload.data.authenticated, isTrue);
-    expect(sessionManager.credentials, isNotNull);
-    expect(sessionManager.credentials!.id, 'test-user');
-    expect(sessionManager.credentials!.password, 'test-password');
-  });
-
-  test('schedule today joins concurrent loads before surfacing a network failure', () async {
-    final service = KlasflowService(
-      terminal: _SilentTerminal(),
-      sessionManager: _MemorySessionManager(
-        credentials: const SessionCredentials(id: 'test-user', password: 'test-password'),
-      ),
-      environment: const <String, String>{},
-      clientFactory: () => KlasClient(
-        config: KlasClientConfig(baseUri: Uri.parse('https://example.com')),
-        httpClient: MockClient((request) async {
-          switch (request.url.path) {
-            case '/usr/cmn/login/LoginSecurity.do':
-              return _jsonResponse({
-                'data': {
-                  'publicKeyModulus': modulus,
-                  'publicKeyExponent': '10001',
-                  'loginToken': 'nonce-1',
-                },
-              });
-            case '/usr/cmn/login/LoginCaptcha.do':
-              return http.Response('OK', 200);
-            case '/usr/cmn/login/LoginConfirm.do':
-              return _jsonResponse({'success': true});
-            case '/std/cmn/frame/KlasStop.do':
-              return _utf8TextResponse('<html><head><title>KLAS</title></head></html>', 200);
-            case '/std/cmn/frame/YearhakgiAtnlcSbjectList.do':
-              return _jsonResponse({
-                'data': [
-                  {
-                    'selectYearhakgi': '20261',
-                    'selectSubj': 'CSE101',
-                    'selectChangeYn': 'N',
-                    'isDefault': true,
-                    'subjectName': '자료구조 - 김교수',
-                  },
-                ],
-              });
-            case '/api/v1/session/info':
-              return _jsonResponse({'authenticated': true, 'userId': 'test-user', 'userName': '테스터'});
-            case '/std/cmn/frame/StdHome.do':
-              return _utf8TextResponse('<html><body>ok</body></html>', 200);
-            case '/std/ads/atnlc/TimetableStdList.do':
-              return Future<http.Response>.delayed(
-                const Duration(milliseconds: 10),
-                () => _jsonResponse({'list': const <Object?>[]}),
-              );
-            case '/std/ads/atnlc/AtnlcScheduleList.do':
-              throw const NetworkException('upstream payload with secrets');
-            default:
-              return http.Response('Not Found', 404);
-          }
-        }),
-      ),
-    );
-
-    await expectLater(
-      service.scheduleToday(allowPrompt: false),
-      throwsA(
-        isA<NetworkException>().having(
-          (error) => ErrorMapper().map(error).message,
-          'sanitized message',
-          'A network or KLAS service error occurred while processing the request.',
+                });
+              case '/usr/cmn/login/LoginCaptcha.do':
+                return http.Response('OK', 200);
+              case '/usr/cmn/login/LoginConfirm.do':
+                return _jsonResponse({'success': true});
+              case '/std/cmn/frame/KlasStop.do':
+                return _utf8TextResponse(
+                  '<html><head><title>KLAS</title></head></html>',
+                  200,
+                  headers: {'content-type': 'text/html; charset=utf-8'},
+                );
+              case '/std/cmn/frame/YearhakgiAtnlcSbjectList.do':
+                return _jsonResponse({
+                  'data': [
+                    {
+                      'selectYearhakgi': '20261',
+                      'selectSubj': 'CSE101',
+                      'selectChangeYn': 'N',
+                      'isDefault': true,
+                      'subjectName': '자료구조 - 김교수',
+                    },
+                  ],
+                });
+              case '/api/v1/session/info':
+                return _jsonResponse({
+                  'authenticated': true,
+                  'userId': 'test-user',
+                  'userName': '테스터',
+                });
+              default:
+                return http.Response('Not Found', 404);
+            }
+          }),
         ),
-      ),
-    );
-  });
+      );
+
+      final payload = await service.login(
+        allowPrompt: false,
+        useStdinJson: false,
+      );
+
+      expect(payload.data.authenticated, isTrue);
+      expect(sessionManager.credentials, isNotNull);
+      expect(sessionManager.credentials!.id, 'test-user');
+      expect(sessionManager.credentials!.password, 'test-password');
+    },
+  );
+
+  test(
+    'profile falls back to environment after invalid stored session',
+    () async {
+      final sessionManager = _MemorySessionManager(
+        credentials: const SessionCredentials(
+          id: 'bad-user',
+          password: 'bad-password',
+        ),
+      );
+      var loginAttempts = 0;
+      final service = KlasflowService(
+        terminal: _SilentTerminal(),
+        sessionManager: sessionManager,
+        environment: const <String, String>{
+          'KLAS_ID': 'env-user',
+          'KLAS_PASSWORD': 'env-password',
+        },
+        clientFactory: () => KlasClient(
+          config: KlasClientConfig(baseUri: Uri.parse('https://example.com')),
+          httpClient: MockClient((request) async {
+            switch (request.url.path) {
+              case '/usr/cmn/login/LoginSecurity.do':
+                loginAttempts++;
+                return _jsonResponse({
+                  'data': {
+                    'publicKeyModulus': modulus,
+                    'publicKeyExponent': '10001',
+                    'loginToken': loginAttempts == 1
+                        ? 'bad-nonce'
+                        : 'good-nonce',
+                  },
+                });
+              case '/usr/cmn/login/LoginCaptcha.do':
+                return http.Response('OK', 200);
+              case '/usr/cmn/login/LoginConfirm.do':
+                if (loginAttempts == 1) {
+                  return _jsonResponse({'error': 'invalid'}, statusCode: 401);
+                }
+                return _jsonResponse({'success': true});
+              case '/std/cmn/frame/KlasStop.do':
+                return _utf8TextResponse(
+                  '<html><head><title>KLAS</title></head></html>',
+                  200,
+                );
+              case '/std/cmn/frame/YearhakgiAtnlcSbjectList.do':
+                return _jsonResponse({
+                  'data': [
+                    {
+                      'selectYearhakgi': '20261',
+                      'selectSubj': 'CSE101',
+                      'selectChangeYn': 'N',
+                      'isDefault': true,
+                      'subjectName': '자료구조 - 김교수',
+                    },
+                  ],
+                });
+              case '/api/v1/session/info':
+                return _jsonResponse({
+                  'authenticated': true,
+                  'userId': 'env-user',
+                  'userName': '테스터',
+                });
+              case '/std/ads/admst/IdModifySpvInfo.do':
+                return _jsonResponse({'kname': '테스터'});
+              default:
+                return http.Response('Not Found', 404);
+            }
+          }),
+        ),
+      );
+
+      final payload = await service.profile(allowPrompt: false);
+
+      expect(payload.data.authenticated, isTrue);
+      expect(payload.data.name, '테스터');
+      expect(sessionManager.credentials, isNull);
+    },
+  );
+
+  test(
+    'auth status falls back to environment when stored session is invalid',
+    () async {
+      final sessionManager = _MemorySessionManager(
+        credentials: const SessionCredentials(
+          id: 'bad-user',
+          password: 'bad-password',
+        ),
+      );
+      var loginAttempts = 0;
+      final service = KlasflowService(
+        terminal: _SilentTerminal(),
+        sessionManager: sessionManager,
+        environment: const <String, String>{
+          'KLAS_ID': 'env-user',
+          'KLAS_PASSWORD': 'env-password',
+        },
+        clientFactory: () => KlasClient(
+          config: KlasClientConfig(baseUri: Uri.parse('https://example.com')),
+          httpClient: MockClient((request) async {
+            switch (request.url.path) {
+              case '/usr/cmn/login/LoginSecurity.do':
+                loginAttempts++;
+                return _jsonResponse({
+                  'data': {
+                    'publicKeyModulus': modulus,
+                    'publicKeyExponent': '10001',
+                    'loginToken': loginAttempts == 1
+                        ? 'bad-nonce'
+                        : 'good-nonce',
+                  },
+                });
+              case '/usr/cmn/login/LoginCaptcha.do':
+                return http.Response('OK', 200);
+              case '/usr/cmn/login/LoginConfirm.do':
+                if (loginAttempts == 1) {
+                  return _jsonResponse({'error': 'invalid'}, statusCode: 401);
+                }
+                return _jsonResponse({'success': true});
+              case '/std/cmn/frame/KlasStop.do':
+                return _utf8TextResponse(
+                  '<html><head><title>KLAS</title></head></html>',
+                  200,
+                );
+              case '/std/cmn/frame/YearhakgiAtnlcSbjectList.do':
+                return _jsonResponse({
+                  'data': [
+                    {
+                      'selectYearhakgi': '20261',
+                      'selectSubj': 'CSE101',
+                      'selectChangeYn': 'N',
+                      'isDefault': true,
+                      'subjectName': '자료구조 - 김교수',
+                    },
+                  ],
+                });
+              case '/api/v1/session/info':
+                return _jsonResponse({
+                  'authenticated': true,
+                  'userId': 'env-user',
+                  'userName': '테스터',
+                });
+              default:
+                return http.Response('Not Found', 404);
+            }
+          }),
+        ),
+      );
+
+      final payload = await service.authStatus();
+
+      expect(payload.data.authenticated, isTrue);
+      expect(payload.data.credentialSource, 'env');
+      expect(payload.data.reusable, isTrue);
+      expect(sessionManager.credentials, isNull);
+    },
+  );
+
+  test(
+    'schedule today joins concurrent loads before surfacing a network failure',
+    () async {
+      final service = KlasflowService(
+        terminal: _SilentTerminal(),
+        sessionManager: _MemorySessionManager(
+          credentials: const SessionCredentials(
+            id: 'test-user',
+            password: 'test-password',
+          ),
+        ),
+        environment: const <String, String>{},
+        clientFactory: () => KlasClient(
+          config: KlasClientConfig(baseUri: Uri.parse('https://example.com')),
+          httpClient: MockClient((request) async {
+            switch (request.url.path) {
+              case '/usr/cmn/login/LoginSecurity.do':
+                return _jsonResponse({
+                  'data': {
+                    'publicKeyModulus': modulus,
+                    'publicKeyExponent': '10001',
+                    'loginToken': 'nonce-1',
+                  },
+                });
+              case '/usr/cmn/login/LoginCaptcha.do':
+                return http.Response('OK', 200);
+              case '/usr/cmn/login/LoginConfirm.do':
+                return _jsonResponse({'success': true});
+              case '/std/cmn/frame/KlasStop.do':
+                return _utf8TextResponse(
+                  '<html><head><title>KLAS</title></head></html>',
+                  200,
+                );
+              case '/std/cmn/frame/YearhakgiAtnlcSbjectList.do':
+                return _jsonResponse({
+                  'data': [
+                    {
+                      'selectYearhakgi': '20261',
+                      'selectSubj': 'CSE101',
+                      'selectChangeYn': 'N',
+                      'isDefault': true,
+                      'subjectName': '자료구조 - 김교수',
+                    },
+                  ],
+                });
+              case '/api/v1/session/info':
+                return _jsonResponse({
+                  'authenticated': true,
+                  'userId': 'test-user',
+                  'userName': '테스터',
+                });
+              case '/std/cmn/frame/StdHome.do':
+                return _utf8TextResponse('<html><body>ok</body></html>', 200);
+              case '/std/ads/atnlc/TimetableStdList.do':
+                return Future<http.Response>.delayed(
+                  const Duration(milliseconds: 10),
+                  () => _jsonResponse({'list': const <Object?>[]}),
+                );
+              case '/std/ads/atnlc/AtnlcScheduleList.do':
+                throw const NetworkException('upstream payload with secrets');
+              default:
+                return http.Response('Not Found', 404);
+            }
+          }),
+        ),
+      );
+
+      await expectLater(
+        service.scheduleToday(allowPrompt: false),
+        throwsA(
+          isA<NetworkException>().having(
+            (error) => ErrorMapper().map(error).message,
+            'sanitized message',
+            'A network or KLAS service error occurred while processing the request.',
+          ),
+        ),
+      );
+    },
+  );
 }
 
 final class _SilentTerminal implements Terminal {
@@ -380,7 +572,9 @@ http.Response _jsonResponse(Map<String, dynamic> body, {int statusCode = 200}) {
   return http.Response(
     jsonEncode(body),
     statusCode,
-    headers: <String, String>{'content-type': 'application/json; charset=utf-8'},
+    headers: <String, String>{
+      'content-type': 'application/json; charset=utf-8',
+    },
   );
 }
 
