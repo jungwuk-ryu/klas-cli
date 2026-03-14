@@ -46,7 +46,8 @@ The target command tree is:
 - `klas courses list|show`
 - `klas tasks list|due|overdue|show`
 - `klas notices list|show`
-- `klas schedule today|week|next`
+- `klas timetable week`
+- `klas calendar month`
 - `klas progress by-course|show`
 - `klas files list|download`
 
