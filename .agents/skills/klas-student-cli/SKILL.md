@@ -1,6 +1,6 @@
 ---
 name: klas-student-cli
-description: Use the local KLAS Dart CLI to answer read-only student questions about auth, courses, tasks, notices, and schedule. Prefer JSON output.
+description: Use the local KLAS Dart CLI to answer read-only student questions about auth, courses, tasks, notices, timetable, and calendar. Prefer JSON output.
 compatibility: opencode
 metadata:
   audience: personal-agent
@@ -17,9 +17,8 @@ Use this skill when a student or agent needs read-only KLAS information from the
 - details for one task
 - current course list
 - course notices
-- today's schedule
 - this week's schedule
-- next upcoming schedule item
+- monthly calendar schedule
 - auth readiness for the CLI
 
 ## Auth guidance
@@ -128,19 +127,20 @@ klas --format json notices list --course "자료구조"
 klas --format json --dry-run tasks show 12 --course "CSE101"
 ```
 
-### Schedule queries
+### Timetable and calendar queries
 
 ```bash
-klas --format json schedule today
-klas --format json schedule week
-klas --format json schedule next
+klas --format json timetable week
+klas --format json calendar month
+klas --format json calendar month --year 2026 --month 3
 ```
 
 ## Interpretation rules
 
 - `tasks list` is the truthful replacement for "remaining assignments" in v1. Do not invent overdue semantics unless the CLI adds dedicated overdue commands later.
-- `schedule week` is timetable-based recurring class data.
-- `schedule today` and `schedule next` use a combined view of timetable and monthly schedule items.
+- `timetable week` is timetable-based recurring class data.
+- `calendar month` is the direct monthly schedule table view.
+- there is no mixed `today` command in the canonical surface.
 - `warnings` in the JSON envelope matter. They can indicate partial failures during course fan-out.
 - `schema` is the preferred way to discover supported flags and normalized output fields at runtime.
 - `--fields` only trims top-level keys in the normalized JSON `data` payload.

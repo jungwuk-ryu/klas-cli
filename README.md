@@ -57,9 +57,8 @@ klas courses show --course <course>
 klas tasks list [--course <course>]
 klas tasks show <task-no> [--course <course>]
 klas notices list [--course <course>]
-klas schedule today
-klas schedule week
-klas schedule next
+klas timetable week
+klas calendar month [--year <year>] [--month <month>]
 klas schema [command ...]
 ```
 
@@ -196,11 +195,12 @@ klas --format json --dry-run tasks show 12 --course CSE101
 
 자세한 JSON 규칙은 `doc/json-contract.md`에서 볼 수 있습니다.
 
-## 스케줄 명령 기준
+## 시간표와 일정 명령 기준
 
-- `schedule week`: 반복 수업 시간표 기준
-- `schedule today`: 오늘 시간표와 월간 일정을 함께 조회
-- `schedule next`: 시간표와 월간 일정 가운데 가장 가까운 다음 항목을 선택
+- `timetable week`: 반복 수업 시간표 기준
+- `calendar month`: 월간 일정 테이블 항목을 월 기준으로 조회
+
+`today`처럼 시간표와 월간 일정을 섞은 파생 명령은 제거했습니다. 주간 강의 시간표와 월간 일정은 upstream에서도 서로 다른 기능군이라, CLI도 같은 명령 아래 묶지 않고 분리합니다.
 
 `tasks list`, `notices list`처럼 여러 과목을 한 번에 훑는 명령은 일부 과목 조회에 실패해도 전체를 중단하지 않고 `warnings`와 함께 부분 결과를 돌려줄 수 있습니다.
 
@@ -224,6 +224,9 @@ dart run bin/klas.dart --format json schema tasks list
 dart run bin/klas.dart --format json --dry-run courses list
 dart run bin/klas.dart --format json --fields path,description schema tasks list
 dart run bin/klas.dart --format json --dry-run tasks show 12 --course CSE101
+dart run bin/klas.dart --format json schema timetable
+dart run bin/klas.dart --format json schema calendar month
+dart run bin/klas.dart --format json --dry-run calendar month --year 2026 --month 3
 ```
 
 ## 관련 문서

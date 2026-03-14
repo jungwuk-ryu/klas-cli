@@ -30,10 +30,10 @@
 
 ## Trimmed command surface
 
-- Chosen option: ship `auth login|status|logout`, `me profile`, `courses list|show`, `tasks list|show`, `notices list`, and `schedule today|week|next` in v1.
-- Alternatives considered: shipping the full target surface immediately; deferring schedule as well.
-- Why this is better here: these commands map cleanly to verified public `klasflow` APIs without guessed joins or speculative semantics.
-- Remaining risk: `schedule` merges recurring timetable data with calendar-style schedule data and needs explicit precedence and warning behavior.
+- Chosen option: ship `auth login|status|logout`, `me profile`, `courses list|show`, `tasks list|show`, `notices list`, `timetable week`, and `calendar month` in v1.
+- Alternatives considered: keeping a mixed `schedule` family; preserving `today` as a derived command; nesting timetable and calendar under one `schedule` group.
+- Why this is better here: `timetable week` maps to the verified semester timetable API, and `calendar month` maps directly to the verified monthly schedule table API, so the command tree now follows real data domains instead of mixing them behind one noun.
+- Remaining risk: the CLI no longer offers a blended daily view, so users who want a combined “today” view must query timetable and calendar separately.
 
 ## Session persistence scope
 

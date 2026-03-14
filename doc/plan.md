@@ -28,7 +28,8 @@ Build a production-ready Dart CLI on top of `klasflow` that is safe for human st
 - `courses list|show`
 - `tasks list|show`
 - `notices list`
-- `schedule today|week|next`
+- `timetable week`
+- `calendar month`
 
 ## Deferred Until Upstream Support Is Stronger
 
@@ -42,7 +43,7 @@ Build a production-ready Dart CLI on top of `klasflow` that is safe for human st
 1. Create package scaffolding and dependency strategy for `klasflow`.
 2. Build core CLI infrastructure: command runner, output formatter, error mapper, exit codes.
 3. Build auth/session layer with secure local persistence and silent recovery where safe.
-4. Add normalized domain models and services for profile, courses, tasks, notices, schedule, files, and any truthful progress view.
+4. Add normalized domain models and services for profile, courses, tasks, notices, timetable, calendar, files, and any truthful progress view.
 5. Add automated tests for parsing, output contracts, auth behavior, and core happy paths.
 6. Update README, docs, and agent skill to match shipped behavior.
 7. Add one-line installer scripts for Unix and Windows that bootstrap Dart when missing, activate the pub.dev package, and hand off to `klas auth login`.
