@@ -356,35 +356,15 @@ const Map<String, CommandContract> commandContracts = <String, CommandContract>{
       ),
     ],
   ),
-  'schedule': CommandContract(
-    path: 'schedule',
-    description: 'Show today, week, or next schedule items.',
+  'timetable': CommandContract(
+    path: 'timetable',
+    description: 'Show recurring class timetable entries.',
     supportsFields: false,
     outputFields: <String>[],
-    subcommands: <String>['schedule today', 'schedule week', 'schedule next'],
+    subcommands: <String>['timetable week'],
   ),
-  'schedule today': CommandContract(
-    path: 'schedule today',
-    description: 'Show schedule items for today.',
-    authRequired: true,
-    supportsDryRun: true,
-    supportsFields: true,
-    outputFields: <String>[
-      'kind',
-      'source',
-      'title',
-      'course_id',
-      'course_title',
-      'professor_name',
-      'classroom',
-      'day_of_week',
-      'starts_at',
-      'ends_at',
-      'status',
-    ],
-  ),
-  'schedule week': CommandContract(
-    path: 'schedule week',
+  'timetable week': CommandContract(
+    path: 'timetable week',
     description: 'Show weekly recurring timetable entries.',
     authRequired: true,
     supportsDryRun: true,
@@ -403,9 +383,16 @@ const Map<String, CommandContract> commandContracts = <String, CommandContract>{
       'status',
     ],
   ),
-  'schedule next': CommandContract(
-    path: 'schedule next',
-    description: 'Show the next upcoming schedule item.',
+  'calendar': CommandContract(
+    path: 'calendar',
+    description: 'Show dated monthly calendar schedule items.',
+    supportsFields: false,
+    outputFields: <String>[],
+    subcommands: <String>['calendar month'],
+  ),
+  'calendar month': CommandContract(
+    path: 'calendar month',
+    description: 'Show monthly schedule table items.',
     authRequired: true,
     supportsDryRun: true,
     supportsFields: true,
@@ -421,6 +408,18 @@ const Map<String, CommandContract> commandContracts = <String, CommandContract>{
       'starts_at',
       'ends_at',
       'status',
+    ],
+    options: <CommandOptionSchema>[
+      CommandOptionSchema(
+        name: '--year',
+        type: 'integer',
+        description: 'Calendar year for the month view.',
+      ),
+      CommandOptionSchema(
+        name: '--month',
+        type: 'integer',
+        description: 'Calendar month number from 1 to 12.',
+      ),
     ],
   ),
 };

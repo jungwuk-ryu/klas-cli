@@ -39,7 +39,8 @@ final class KlasCommandRunner extends CommandRunner<int> {
     addCommand(CoursesGroupCommand(_terminal, _service));
     addCommand(TasksGroupCommand(_terminal, _service));
     addCommand(NoticesGroupCommand(_terminal, _service));
-    addCommand(ScheduleGroupCommand(_terminal, _service));
+    addCommand(TimetableGroupCommand(_terminal, _service));
+    addCommand(CalendarGroupCommand(_terminal, _service));
     addCommand(SchemaCommand(_terminal, _service));
     addCommand(AuthDaemonServeCommand(sessionManager));
   }
@@ -635,46 +636,20 @@ final class NoticesListCommand extends KlasCommand<List<NoticeView>> {
   }
 }
 
-final class ScheduleGroupCommand extends Command<int> {
-  ScheduleGroupCommand(Terminal terminal, KlasService service) {
-    addSubcommand(ScheduleTodayCommand(terminal, service));
-    addSubcommand(ScheduleWeekCommand(terminal, service));
-    addSubcommand(ScheduleNextCommand(terminal, service));
+final class TimetableGroupCommand extends Command<int> {
+  TimetableGroupCommand(Terminal terminal, KlasService service) {
+    addSubcommand(TimetableWeekCommand(terminal, service));
   }
 
   @override
-  String get name => 'schedule';
+  String get name => 'timetable';
 
   @override
-  String get description => 'Show today, week, or next schedule items.';
+  String get description => 'Show recurring class timetable entries.';
 }
 
-final class ScheduleTodayCommand extends KlasCommand<List<ScheduleView>> {
-  ScheduleTodayCommand(super.terminal, super.service);
-
-  @override
-  String get name => 'today';
-
-  @override
-  String get description => 'Show schedule items for today.';
-
-  @override
-  Future<CommandPayload<List<ScheduleView>>> load() {
-    return service.scheduleToday(allowPrompt: allowPrompt);
-  }
-
-  @override
-  Object? toJson(List<ScheduleView> value) {
-    return value.map((item) => item.toJson()).toList(growable: false);
-  }
-
-  @override
-  String toText(List<ScheduleView> value) =>
-      _renderScheduleList(value, empty: 'No schedule items for today.');
-}
-
-final class ScheduleWeekCommand extends KlasCommand<List<ScheduleView>> {
-  ScheduleWeekCommand(super.terminal, super.service);
+final class TimetableWeekCommand extends KlasCommand<List<ScheduleView>> {
+  TimetableWeekCommand(super.terminal, super.service);
 
   @override
   String get name => 'week';
@@ -694,33 +669,80 @@ final class ScheduleWeekCommand extends KlasCommand<List<ScheduleView>> {
 
   @override
   String toText(List<ScheduleView> value) =>
-      _renderScheduleList(value, empty: 'No weekly schedule entries found.');
+      _renderScheduleList(value, empty: 'No weekly timetable entries found.');
 }
 
-final class ScheduleNextCommand extends KlasCommand<ScheduleView?> {
-  ScheduleNextCommand(super.terminal, super.service);
-
-  @override
-  String get name => 'next';
-
-  @override
-  String get description => 'Show the next upcoming schedule item.';
-
-  @override
-  Future<CommandPayload<ScheduleView?>> load() {
-    return service.scheduleNext(allowPrompt: allowPrompt);
+final class CalendarGroupCommand extends Command<int> {
+  CalendarGroupCommand(Terminal terminal, KlasService service) {
+    addSubcommand(CalendarMonthCommand(terminal, service));
   }
 
   @override
-  Object? toJson(ScheduleView? value) => value?.toJson();
+  String get name => 'calendar';
 
   @override
-  String toText(ScheduleView? value) {
-    if (value == null) {
-      return 'No upcoming schedule item found.';
-    }
-    return _renderSchedule(value);
+  String get description => 'Show dated monthly calendar schedule items.';
+}
+
+final class CalendarMonthCommand extends KlasCommand<List<ScheduleView>> {
+  CalendarMonthCommand(super.terminal, super.service) {
+    argParser.addOption('year', help: 'Calendar year for the month view.');
+    argParser.addOption('month', help: 'Calendar month number from 1 to 12.');
   }
+
+  @override
+  String get name => 'month';
+
+  @override
+  String get description => 'Show monthly schedule table items.';
+
+  @override
+  void validateInputs() {
+    validateOptionalIntOption(
+      argResults!['year'] as String?,
+      fieldName: 'year',
+      min: 2000,
+      max: 2100,
+      hint: 'Example: klas calendar month --year 2026 --month 3',
+    );
+    validateOptionalIntOption(
+      argResults!['month'] as String?,
+      fieldName: 'month',
+      min: 1,
+      max: 12,
+      hint: 'Example: klas calendar month --year 2026 --month 3',
+    );
+  }
+
+  @override
+  Future<CommandPayload<List<ScheduleView>>> load() {
+    return service.scheduleMonth(
+      allowPrompt: allowPrompt,
+      year: validateOptionalIntOption(
+        argResults!['year'] as String?,
+        fieldName: 'year',
+        min: 2000,
+        max: 2100,
+        hint: 'Example: klas calendar month --year 2026 --month 3',
+      ),
+      month: validateOptionalIntOption(
+        argResults!['month'] as String?,
+        fieldName: 'month',
+        min: 1,
+        max: 12,
+        hint: 'Example: klas calendar month --year 2026 --month 3',
+      ),
+    );
+  }
+
+  @override
+  Object? toJson(List<ScheduleView> value) {
+    return value.map((item) => item.toJson()).toList(growable: false);
+  }
+
+  @override
+  String toText(List<ScheduleView> value) =>
+      _renderScheduleList(value, empty: 'No monthly schedule items found.');
 }
 
 final class SchemaCommand extends KlasCommand<Object?> {
@@ -780,5 +802,5 @@ String _renderScheduleList(List<ScheduleView> items, {required String empty}) {
 }
 
 String _renderSchedule(ScheduleView item) {
-  return '${item.title} | kind=${item.kind.value} | day=${item.dayOfWeek ?? '-'} | start=${item.startsAt ?? '-'} | room=${item.classroom ?? '-'}';
+  return '${item.title} | kind=${item.kind.value} | day=${item.dayOfWeek ?? '-'} | start=${item.startsAt ?? '-'} | room=${item.classroom ?? '-'} | status=${item.status ?? '-'}';
 }

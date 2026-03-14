@@ -149,6 +149,139 @@ void main() {
     expect(payload['data']['supports_dry_run'], isTrue);
   });
 
+  test('schema timetable lists week subcommand', () async {
+    final terminal = FakeTerminal();
+
+    final exitCode = await runKlasCli(
+      <String>['--format', 'json', 'schema', 'timetable'],
+      terminal: terminal,
+      service: FakeKlasService(),
+    );
+
+    expect(exitCode, ExitCodes.success);
+    final payload =
+        jsonDecode(terminal.outLines.single) as Map<String, dynamic>;
+    expect(payload['data']['subcommands'], <dynamic>['timetable week']);
+  });
+
+  test('schema calendar lists month subcommand', () async {
+    final terminal = FakeTerminal();
+
+    final exitCode = await runKlasCli(
+      <String>['--format', 'json', 'schema', 'calendar'],
+      terminal: terminal,
+      service: FakeKlasService(),
+    );
+
+    expect(exitCode, ExitCodes.success);
+    final payload =
+        jsonDecode(terminal.outLines.single) as Map<String, dynamic>;
+    expect(payload['data']['subcommands'], <dynamic>['calendar month']);
+  });
+
+  test('schema schedule path is removed from the canonical surface', () async {
+    final terminal = FakeTerminal();
+
+    final exitCode = await runKlasCli(
+      <String>['--format', 'json', 'schema', 'schedule'],
+      terminal: terminal,
+      service: FakeKlasService(),
+    );
+
+    expect(exitCode, ExitCodes.usage);
+    final payload =
+        jsonDecode(terminal.outLines.single) as Map<String, dynamic>;
+    expect(payload['error']['code'], 'USAGE_ERROR');
+    expect(
+      payload['error']['message'],
+      contains('No schema entry matched the requested command path'),
+    );
+  });
+
+  test(
+    'calendar month validates month range before service execution',
+    () async {
+      final terminal = FakeTerminal();
+      var called = false;
+      final service = FakeKlasService(
+        scheduleMonthHandler: ({required allowPrompt, year, month}) async {
+          called = true;
+          return const CommandPayload<List<ScheduleView>>(
+            data: <ScheduleView>[],
+          );
+        },
+      );
+
+      final exitCode = await runKlasCli(
+        <String>['--format', 'json', 'calendar', 'month', '--month', '13'],
+        terminal: terminal,
+        service: service,
+      );
+
+      expect(exitCode, ExitCodes.usage);
+      expect(called, isFalse);
+      final payload =
+          jsonDecode(terminal.outLines.single) as Map<String, dynamic>;
+      expect(payload['error']['code'], 'USAGE_ERROR');
+      expect(
+        payload['error']['message'],
+        contains('month must be between 1 and 12'),
+      );
+    },
+  );
+
+  test('calendar month forwards validated year and month to service', () async {
+    final terminal = FakeTerminal();
+    int? seenYear;
+    int? seenMonth;
+    final service = FakeKlasService(
+      scheduleMonthHandler: ({required allowPrompt, year, month}) async {
+        seenYear = year;
+        seenMonth = month;
+        return const CommandPayload<List<ScheduleView>>(data: <ScheduleView>[]);
+      },
+    );
+
+    final exitCode = await runKlasCli(
+      <String>[
+        '--format',
+        'json',
+        'calendar',
+        'month',
+        '--year',
+        '2026',
+        '--month',
+        '3',
+      ],
+      terminal: terminal,
+      service: service,
+    );
+
+    expect(exitCode, ExitCodes.success);
+    expect(seenYear, 2026);
+    expect(seenMonth, 3);
+  });
+
+  test('timetable week forwards to timetable service path', () async {
+    final terminal = FakeTerminal();
+    var called = false;
+    final service = FakeKlasService(
+      scheduleWeekHandler: ({required allowPrompt}) async {
+        called = true;
+        return const CommandPayload<List<ScheduleView>>(data: <ScheduleView>[]);
+      },
+    );
+
+    final exitCode = await runKlasCli(
+      <String>['--format', 'json', 'timetable', 'week'],
+      terminal: terminal,
+      service: service,
+    );
+
+    expect(exitCode, ExitCodes.success);
+    expect(called, isTrue);
+  });
+
   test('fields trims json data to the requested keys', () async {
     final terminal = FakeTerminal();
     final service = FakeKlasService(
@@ -365,6 +498,16 @@ typedef ListTasksHandler =
       required bool allowPrompt,
       String? courseSelector,
     });
+typedef ScheduleMonthHandler =
+    Future<CommandPayload<List<ScheduleView>>> Function({
+      required bool allowPrompt,
+      int? year,
+      int? month,
+    });
+typedef ScheduleWeekHandler =
+    Future<CommandPayload<List<ScheduleView>>> Function({
+      required bool allowPrompt,
+    });
 
 final class FakeKlasService implements KlasService {
   FakeKlasService({
@@ -374,6 +517,8 @@ final class FakeKlasService implements KlasService {
     this.listCoursesHandler,
     this.showCourseHandler,
     this.listTasksHandler,
+    this.scheduleMonthHandler,
+    this.scheduleWeekHandler,
   });
 
   final LoginHandler? loginHandler;
@@ -382,6 +527,8 @@ final class FakeKlasService implements KlasService {
   final ListCoursesHandler? listCoursesHandler;
   final ShowCourseHandler? showCourseHandler;
   final ListTasksHandler? listTasksHandler;
+  final ScheduleMonthHandler? scheduleMonthHandler;
+  final ScheduleWeekHandler? scheduleWeekHandler;
 
   @override
   Future<CommandPayload<AuthStatusView>> authStatus() async {
@@ -461,24 +608,25 @@ final class FakeKlasService implements KlasService {
   }
 
   @override
-  Future<CommandPayload<List<ScheduleView>>> scheduleToday({
+  Future<CommandPayload<List<ScheduleView>>> scheduleMonth({
     required bool allowPrompt,
+    int? year,
+    int? month,
   }) async {
-    return const CommandPayload<List<ScheduleView>>(data: <ScheduleView>[]);
-  }
-
-  @override
-  Future<CommandPayload<ScheduleView?>> scheduleNext({
-    required bool allowPrompt,
-  }) async {
-    return const CommandPayload<ScheduleView?>(data: null);
+    return scheduleMonthHandler?.call(
+          allowPrompt: allowPrompt,
+          year: year,
+          month: month,
+        ) ??
+        const CommandPayload<List<ScheduleView>>(data: <ScheduleView>[]);
   }
 
   @override
   Future<CommandPayload<List<ScheduleView>>> scheduleWeek({
     required bool allowPrompt,
   }) async {
-    return const CommandPayload<List<ScheduleView>>(data: <ScheduleView>[]);
+    return scheduleWeekHandler?.call(allowPrompt: allowPrompt) ??
+        const CommandPayload<List<ScheduleView>>(data: <ScheduleView>[]);
   }
 
   @override

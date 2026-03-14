@@ -102,3 +102,39 @@ Object? selectJsonFields(Object? value, List<String> fields) {
   }
   return value;
 }
+
+int? validateOptionalIntOption(
+  String? value, {
+  required String fieldName,
+  int? min,
+  int? max,
+  String? hint,
+}) {
+  if (value == null) {
+    return null;
+  }
+  final trimmed = validateNoControlChars(
+    value,
+    fieldName: fieldName,
+    emptyHint: hint,
+  );
+  final parsed = int.tryParse(trimmed);
+  if (parsed == null) {
+    throw CliException(
+      code: 'USAGE_ERROR',
+      message: '$fieldName must be an integer.',
+      exitCode: ExitCodes.usage,
+      hint: hint,
+    );
+  }
+  if (min != null && parsed < min || max != null && parsed > max) {
+    throw CliException(
+      code: 'USAGE_ERROR',
+      message:
+          '$fieldName must be between ${min ?? parsed} and ${max ?? parsed}.',
+      exitCode: ExitCodes.usage,
+      hint: hint,
+    );
+  }
+  return parsed;
+}
