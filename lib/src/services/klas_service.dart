@@ -50,16 +50,14 @@ abstract interface class KlasService {
     String? courseSelector,
   });
 
-  Future<CommandPayload<List<ScheduleView>>> scheduleToday({
-    required bool allowPrompt,
-  });
-
   Future<CommandPayload<List<ScheduleView>>> scheduleWeek({
     required bool allowPrompt,
   });
 
-  Future<CommandPayload<ScheduleView?>> scheduleNext({
+  Future<CommandPayload<List<ScheduleView>>> scheduleMonth({
     required bool allowPrompt,
+    int? year,
+    int? month,
   });
 }
 
@@ -441,47 +439,6 @@ final class KlasflowService implements KlasService {
   }
 
   @override
-  Future<CommandPayload<List<ScheduleView>>> scheduleToday({
-    required bool allowPrompt,
-  }) async {
-    return _withUser(
-      allowPrompt: allowPrompt,
-      action: (client, user, _) async {
-        final timetableFuture = user.timetable();
-        final monthlyFuture = user.attendance.listMonthlySchedules();
-        await Future.wait<Object?>(<Future<Object?>>[
-          timetableFuture,
-          monthlyFuture,
-        ]);
-        final timetable = await timetableFuture;
-        final monthly = await monthlyFuture;
-        final today = DateTime.now();
-        final weekday = _weekdayLabel(today.weekday);
-
-        final classItems = timetable.entries
-            .where((entry) => entry.dayOfWeek == weekday)
-            .map(_mapTimetableEntry)
-            .toList(growable: false);
-        final calendarItems = monthly
-            .where((item) => _matchesDate(item.date, today))
-            .map(_mapMonthlySchedule)
-            .toList(growable: false);
-        final data = <ScheduleView>[...classItems, ...calendarItems]
-          ..sort(_compareScheduleViews);
-
-        return CommandPayload<List<ScheduleView>>(
-          data: data,
-          meta: <String, Object?>{
-            'count': data.length,
-            'basis': 'timetable+monthly_schedule',
-            'date': _normalizeDate(today.toIso8601String()),
-          },
-        );
-      },
-    );
-  }
-
-  @override
   Future<CommandPayload<List<ScheduleView>>> scheduleWeek({
     required bool allowPrompt,
   }) async {
@@ -491,7 +448,7 @@ final class KlasflowService implements KlasService {
         final timetable = await user.timetable();
         final data =
             timetable.entries.map(_mapTimetableEntry).toList(growable: false)
-              ..sort(_compareScheduleViews);
+              ..sort(_compareWeekScheduleViews);
         return CommandPayload<List<ScheduleView>>(
           data: data,
           meta: <String, Object?>{'count': data.length, 'basis': 'timetable'},
@@ -501,51 +458,40 @@ final class KlasflowService implements KlasService {
   }
 
   @override
-  Future<CommandPayload<ScheduleView?>> scheduleNext({
+  Future<CommandPayload<List<ScheduleView>>> scheduleMonth({
     required bool allowPrompt,
+    int? year,
+    int? month,
   }) async {
     return _withUser(
       allowPrompt: allowPrompt,
       action: (client, user, _) async {
         final now = DateTime.now();
-        final timetableFuture = user.timetable();
-        final monthlyFuture = user.attendance.listMonthlySchedules();
-        await Future.wait<Object?>(<Future<Object?>>[
-          timetableFuture,
-          monthlyFuture,
-        ]);
-        final timetable = await timetableFuture;
-        final monthly = await monthlyFuture;
-        final candidates = <(DateTime, ScheduleView)>[];
+        final resolvedYear = year ?? now.year;
+        final resolvedMonth = month ?? now.month;
+        final monthly = await user.attendance.listMonthlyScheduleTableItems(
+          year: resolvedYear,
+          month: resolvedMonth,
+        );
+        final data =
+            monthly
+                .map(
+                  (item) => _mapMonthlyScheduleTableItem(
+                    item,
+                    year: resolvedYear,
+                    month: resolvedMonth,
+                  ),
+                )
+                .toList(growable: false)
+              ..sort(_compareScheduleDateViews);
 
-        for (final entry in timetable.entries) {
-          final occurrence = _nextOccurrenceForEntry(entry, now);
-          if (occurrence == null) {
-            continue;
-          }
-          candidates.add((
-            occurrence,
-            _mapTimetableEntry(entry, startsAt: occurrence.toIso8601String()),
-          ));
-        }
-
-        for (final item in monthly) {
-          final occurrence = _parseDateOnly(item.date);
-          if (occurrence == null ||
-              occurrence.isBefore(DateTime(now.year, now.month, now.day))) {
-            continue;
-          }
-          candidates.add((occurrence, _mapMonthlySchedule(item)));
-        }
-
-        candidates.sort((left, right) => left.$1.compareTo(right.$1));
-        final next = candidates.isEmpty ? null : candidates.first.$2;
-
-        return CommandPayload<ScheduleView?>(
-          data: next,
+        return CommandPayload<List<ScheduleView>>(
+          data: data,
           meta: <String, Object?>{
-            'basis': 'timetable+monthly_schedule',
-            'found': next != null,
+            'count': data.length,
+            'basis': 'monthly_schedule_table',
+            'year': resolvedYear,
+            'month': resolvedMonth,
           },
         );
       },
@@ -997,7 +943,11 @@ int _compareTaskViews(TaskView left, TaskView right) {
   return left.taskNo.compareTo(right.taskNo);
 }
 
-ScheduleView _mapTimetableEntry(KlasTimetableEntry entry, {String? startsAt}) {
+ScheduleView _mapTimetableEntry(
+  KlasTimetableEntry entry, {
+  String? startsAt,
+  String? endsAt,
+}) {
   return ScheduleView(
     kind: ScheduleKind.classSession,
     source: 'timetable',
@@ -1007,17 +957,21 @@ ScheduleView _mapTimetableEntry(KlasTimetableEntry entry, {String? startsAt}) {
     classroom: entry.classroom,
     dayOfWeek: entry.dayOfWeek,
     startsAt: startsAt ?? _timeOnPlaceholderDate(entry.startTime),
-    endsAt: _timeOnPlaceholderDate(entry.endTime),
+    endsAt: endsAt ?? _timeOnPlaceholderDate(entry.endTime),
   );
 }
 
-ScheduleView _mapMonthlySchedule(KlasMonthlyScheduleItem item) {
-  final normalizedDate = _normalizeDateTime(item.date);
+ScheduleView _mapMonthlyScheduleTableItem(
+  KlasMonthlyScheduleTableItem item, {
+  required int year,
+  required int month,
+}) {
   return ScheduleView(
     kind: ScheduleKind.calendarEvent,
-    source: 'monthly_schedule',
+    source: 'monthly_schedule_table',
     title: item.displayTitle,
-    startsAt: normalizedDate,
+    dayOfWeek: item.weekday,
+    startsAt: _dateOnMonth(item.dayOfMonth, year: year, month: month),
     status: item.status,
   );
 }
@@ -1030,68 +984,19 @@ String? _timeOnPlaceholderDate(String? value) {
   return '1970-01-01T$trimmed:00';
 }
 
-String _weekdayLabel(int weekday) {
-  return switch (weekday) {
-    DateTime.monday => '월',
-    DateTime.tuesday => '화',
-    DateTime.wednesday => '수',
-    DateTime.thursday => '목',
-    DateTime.friday => '금',
-    DateTime.saturday => '토',
-    DateTime.sunday => '일',
-    _ => '기타',
-  };
-}
-
-bool _matchesDate(String? raw, DateTime target) {
-  final parsed = _parseDateOnly(raw);
-  if (parsed == null) {
-    return false;
-  }
-  return parsed.year == target.year &&
-      parsed.month == target.month &&
-      parsed.day == target.day;
-}
-
-DateTime? _parseDateOnly(String? raw) {
-  final normalized = _normalizeDate(raw);
-  if (normalized == null) {
+String? _dateOnMonth(String? value, {required int year, required int month}) {
+  final trimmed = value?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
     return null;
   }
-  return DateTime.tryParse(normalized);
-}
-
-DateTime? _nextOccurrenceForEntry(KlasTimetableEntry entry, DateTime now) {
-  final weekday = switch (entry.dayOfWeek) {
-    '월' => DateTime.monday,
-    '화' => DateTime.tuesday,
-    '수' => DateTime.wednesday,
-    '목' => DateTime.thursday,
-    '금' => DateTime.friday,
-    '토' => DateTime.saturday,
-    '일' => DateTime.sunday,
-    _ => null,
-  };
-  if (weekday == null) {
+  final day = int.tryParse(trimmed);
+  if (day == null) {
     return null;
   }
-  final startTime = entry.startTime?.split(':');
-  final hour = startTime != null && startTime.length >= 2
-      ? int.tryParse(startTime[0]) ?? 0
-      : 0;
-  final minute = startTime != null && startTime.length >= 2
-      ? int.tryParse(startTime[1]) ?? 0
-      : 0;
-
-  var delta = weekday - now.weekday;
-  var occurrence = DateTime(now.year, now.month, now.day + delta, hour, minute);
-  if (delta < 0 || occurrence.isBefore(now)) {
-    occurrence = occurrence.add(const Duration(days: 7));
-  }
-  return occurrence;
+  return DateTime(year, month, day).toIso8601String();
 }
 
-int _compareScheduleViews(ScheduleView left, ScheduleView right) {
+int _compareWeekScheduleViews(ScheduleView left, ScheduleView right) {
   final dayCompare = (left.dayOfWeek ?? '').compareTo(right.dayOfWeek ?? '');
   if (dayCompare != 0) {
     return dayCompare;
@@ -1099,6 +1004,18 @@ int _compareScheduleViews(ScheduleView left, ScheduleView right) {
   final startCompare = (left.startsAt ?? '').compareTo(right.startsAt ?? '');
   if (startCompare != 0) {
     return startCompare;
+  }
+  return left.title.compareTo(right.title);
+}
+
+int _compareScheduleDateViews(ScheduleView left, ScheduleView right) {
+  final startCompare = (left.startsAt ?? '').compareTo(right.startsAt ?? '');
+  if (startCompare != 0) {
+    return startCompare;
+  }
+  final dayCompare = (left.dayOfWeek ?? '').compareTo(right.dayOfWeek ?? '');
+  if (dayCompare != 0) {
+    return dayCompare;
   }
   return left.title.compareTo(right.title);
 }

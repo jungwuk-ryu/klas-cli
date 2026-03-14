@@ -5,7 +5,6 @@ import 'package:http/testing.dart';
 import 'package:klas_cli/src/auth/terminal.dart';
 import 'package:klas_cli/src/auth/session_manager.dart';
 import 'package:klas_cli/src/auth/session_metadata.dart';
-import 'package:klas_cli/src/errors/cli_errors.dart';
 import 'package:klas_cli/src/services/klas_service.dart';
 import 'package:klasflow/klasflow.dart';
 import 'package:test/test.dart';
@@ -447,7 +446,7 @@ void main() {
   );
 
   test(
-    'schedule today joins concurrent loads before surfacing a network failure',
+    'monthly schedule table rows map into normalized schedule views',
     () async {
       final service = KlasflowService(
         terminal: _SilentTerminal(),
@@ -475,10 +474,7 @@ void main() {
               case '/usr/cmn/login/LoginConfirm.do':
                 return _jsonResponse({'success': true});
               case '/std/cmn/frame/KlasStop.do':
-                return _utf8TextResponse(
-                  '<html><head><title>KLAS</title></head></html>',
-                  200,
-                );
+                return _utf8TextResponse('<html><body>ok</body></html>', 200);
               case '/std/cmn/frame/YearhakgiAtnlcSbjectList.do':
                 return _jsonResponse({
                   'data': [
@@ -499,13 +495,22 @@ void main() {
                 });
               case '/std/cmn/frame/StdHome.do':
                 return _utf8TextResponse('<html><body>ok</body></html>', 200);
-              case '/std/ads/atnlc/TimetableStdList.do':
-                return Future<http.Response>.delayed(
-                  const Duration(milliseconds: 10),
-                  () => _jsonResponse({'list': const <Object?>[]}),
+              case '/std/ads/admst/MySchdulMonthTableList.do':
+                final body = jsonDecode(request.body) as Map<String, dynamic>;
+                expect(body['schdulYear'], 2026);
+                expect(body['schdulMonth'], 4);
+                return http.Response(
+                  jsonEncode([
+                    {
+                      'started': '2026-04-20',
+                      'dayname': '1',
+                      'schdulTitle': '중간고사',
+                      'typeNm': '학사일정',
+                    },
+                  ]),
+                  200,
+                  headers: {'content-type': 'application/json; charset=utf-8'},
                 );
-              case '/std/ads/atnlc/AtnlcScheduleList.do':
-                throw const NetworkException('upstream payload with secrets');
               default:
                 return http.Response('Not Found', 404);
             }
@@ -513,16 +518,21 @@ void main() {
         ),
       );
 
-      await expectLater(
-        service.scheduleToday(allowPrompt: false),
-        throwsA(
-          isA<NetworkException>().having(
-            (error) => ErrorMapper().map(error).message,
-            'sanitized message',
-            'A network or KLAS service error occurred while processing the request.',
-          ),
-        ),
+      final payload = await service.scheduleMonth(
+        allowPrompt: false,
+        year: 2026,
+        month: 4,
       );
+
+      expect(payload.meta['basis'], 'monthly_schedule_table');
+      expect(payload.meta['year'], 2026);
+      expect(payload.meta['month'], 4);
+      expect(payload.data, hasLength(1));
+      expect(payload.data.first.source, 'monthly_schedule_table');
+      expect(payload.data.first.dayOfWeek, '월');
+      expect(payload.data.first.title, '중간고사');
+      expect(payload.data.first.startsAt, '2026-04-20T00:00:00.000');
+      expect(payload.data.first.status, '학사일정');
     },
   );
 }
