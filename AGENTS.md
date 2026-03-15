@@ -195,6 +195,12 @@ At minimum, keep these areas covered when relevant:
 Prefer deterministic tests.
 Use live account checks only when absolutely necessary and keep them read-only.
 
+Use `dart run tool/check_all.dart` as the CI-aligned baseline quality gate.
+For rollout criteria and release policy, follow:
+
+- `doc/engineering_quality_baseline.md`
+- `doc/release_checklist.md`
+
 ## Documentation requirements
 
 When the external CLI behavior changes, update:

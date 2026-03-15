@@ -1,3 +1,8 @@
+## Unreleased
+
+- Added a CI baseline workflow and `tool/check_all.dart` gate for analyze/test/smoke validation.
+- Added engineering quality baseline and release checklist docs.
+
 ## 0.2.0
 
 - Make local auth more durable with stored credential reuse, automatic session recovery, and safer fallback from invalid saved session state.

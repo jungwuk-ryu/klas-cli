@@ -160,6 +160,7 @@ klas --format json --dry-run tasks show 12 --course CSE101
 ## 확인용 명령어
 
 ```bash
+dart run tool/check_all.dart
 dart analyze
 dart test
 dart run bin/klas.dart --help
@@ -175,5 +176,7 @@ dart run bin/klas.dart --format json --dry-run calendar month --year 2026 --mont
 
 ## 관련 문서
 
+- `doc/engineering_quality_baseline.md`
+- `doc/release_checklist.md`
 - `doc/json-contract.md`
 - `CHANGELOG.md`
