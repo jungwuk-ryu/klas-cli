@@ -100,6 +100,7 @@ klas --format json courses show --course "CSE101"
 
 ```bash
 klas --format json tasks list
+klas --format json --fields course_id,task_no,title tasks list
 ```
 
 ### Show one task
@@ -138,6 +139,7 @@ klas --format json calendar month --year 2026 --month 3
 ## Interpretation rules
 
 - `tasks list` is the truthful replacement for "remaining assignments" in v1. Do not invent overdue semantics unless the CLI adds dedicated overdue commands later.
+- Reuse `course_id` from `tasks list` when a follow-up `tasks show` call needs `--course`.
 - `timetable week` is timetable-based recurring class data.
 - `calendar month` is the direct monthly schedule table view.
 - there is no mixed `today` command in the canonical surface.

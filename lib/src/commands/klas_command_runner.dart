@@ -464,7 +464,7 @@ final class TasksListCommand extends KlasCommand<List<TaskView>> {
 
   @override
   String get description =>
-      'List tasks across courses, with an optional course filter.';
+      'List tasks across courses with course ids, plus an optional course filter.';
 
   @override
   void validateInputs() {
@@ -495,7 +495,7 @@ final class TasksListCommand extends KlasCommand<List<TaskView>> {
     return value
         .map(
           (task) =>
-              '[${task.courseTitle}] #${task.taskNo} ${task.title ?? '-'} | due=${task.dueAt ?? '-'} | status=${task.submissionStatus.value}',
+              '[${task.courseTitle} | ${task.courseId}] #${task.taskNo} ${task.title ?? '-'} | due=${task.dueAt ?? '-'} | status=${task.submissionStatus.value}',
         )
         .join('\n');
   }

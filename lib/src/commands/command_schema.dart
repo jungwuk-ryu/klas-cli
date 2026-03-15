@@ -264,7 +264,8 @@ const Map<String, CommandContract> commandContracts = <String, CommandContract>{
   ),
   'tasks list': CommandContract(
     path: 'tasks list',
-    description: 'List tasks across courses, with an optional course filter.',
+    description:
+        'List tasks across courses with course ids, plus an optional course filter.',
     authRequired: true,
     supportsDryRun: true,
     supportsFields: true,

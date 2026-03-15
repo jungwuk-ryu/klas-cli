@@ -76,6 +76,8 @@ printf '{"id":"your-id","password":"your-password"}' | \
 klas --format json tasks list
 ```
 
+`tasks list`의 기본 텍스트 출력은 각 과제 줄에 `[course_title | course_id]`를 함께 표시합니다. 따라서 `klas tasks list` 결과에서 확인한 course ID를 그대로 `klas tasks show <task-no> --course <course_id>`에 넘길 수 있습니다.
+
 JSON 출력에서는 다음 규칙을 지킵니다.
 
 - `stdout`에는 JSON만 출력합니다.
@@ -94,6 +96,7 @@ JSON 출력에서는 다음 규칙을 지킵니다.
 
 ```bash
 klas --format json schema tasks list
+klas --format json --fields course_id,task_no,title tasks list
 klas --format json --fields course_id,title courses list
 klas --format json --dry-run tasks show 12 --course CSE101
 ```

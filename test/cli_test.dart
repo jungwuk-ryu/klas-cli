@@ -83,6 +83,41 @@ void main() {
     expect(payload['error']['code'], 'USAGE_ERROR');
   });
 
+  test(
+    'tasks list text output includes course id for follow-up show calls',
+    () async {
+      final terminal = FakeTerminal();
+      final service = FakeKlasService(
+        listTasksHandler:
+            ({required allowPrompt, String? courseSelector}) async =>
+                CommandPayload<List<TaskView>>(
+                  data: const <TaskView>[
+                    TaskView(
+                      courseId: 'CSE101',
+                      courseTitle: 'Data Structures',
+                      taskNo: 12,
+                      title: 'Project 1',
+                      dueAt: '2026-03-20T23:59:00',
+                      submissionStatus: TaskSubmissionStatus.notSubmitted,
+                    ),
+                  ],
+                ),
+      );
+
+      final exitCode = await runKlasCli(
+        <String>['tasks', 'list'],
+        terminal: terminal,
+        service: service,
+      );
+
+      expect(exitCode, ExitCodes.success);
+      expect(
+        terminal.outLines.single,
+        '[Data Structures | CSE101] #12 Project 1 | due=2026-03-20T23:59:00 | status=not_submitted',
+      );
+    },
+  );
+
   test('courses show requires --course before service execution', () async {
     final terminal = FakeTerminal();
     var called = false;

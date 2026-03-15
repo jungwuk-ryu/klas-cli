@@ -348,7 +348,7 @@ final class KlasflowService implements KlasService {
             message: 'No task matched the requested task number.',
             exitCode: ExitCodes.notFound,
             hint:
-                'Run `klas tasks list` first, or pass --course to narrow the search.',
+                'Run `klas tasks list` first and reuse its course id, or pass --course to narrow the search.',
           );
         }
         if (matches.length > 1 &&
@@ -358,7 +358,8 @@ final class KlasflowService implements KlasService {
             message:
                 'Multiple tasks share that task number across different courses.',
             exitCode: ExitCodes.usage,
-            hint: 'Pass --course with an exact course id or title.',
+            hint:
+                'Pass --course with the exact course id shown by `klas tasks list`, or an exact course title.',
           );
         }
 
