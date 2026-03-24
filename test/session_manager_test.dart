@@ -8,6 +8,9 @@ import 'package:klas_cli/src/auth/session_metadata.dart';
 import 'package:klas_cli/src/errors/cli_errors.dart';
 import 'package:test/test.dart';
 
+final Map<String, Future<void> Function()> _fakeDaemonClosersByMetadataPath =
+    <String, Future<void> Function()>{};
+
 void main() {
   test(
     'local auth session manager persists daemon-backed reusable session lifecycle',
@@ -39,20 +42,11 @@ void main() {
       );
 
       if (!Platform.isWindows) {
-        final directoryMode = await Process.run('stat', <String>[
-          '-c',
-          '%a',
-          tempDir.path,
-        ]);
-        final fileMode = await Process.run('stat', <String>[
-          '-c',
-          '%a',
+        await _expectOwnerOnlyUnixPermissions(tempDir.path, isDirectory: true);
+        await _expectOwnerOnlyUnixPermissions(
           '${tempDir.path}/auth-session.json',
-        ]);
-        expect(directoryMode.exitCode, 0);
-        expect(fileMode.exitCode, 0);
-        expect((directoryMode.stdout as String).trim(), '700');
-        expect((fileMode.stdout as String).trim(), '600');
+          isDirectory: false,
+        );
       }
 
       expect(await manager.hasSession(), isTrue);
@@ -67,7 +61,6 @@ void main() {
       expect(await manager.load(), isNull);
     },
     timeout: const Timeout(Duration(minutes: 5)),
-    skip: 'Nested daemon integration is covered by manual CLI QA.',
   );
 
   test(
@@ -101,7 +94,9 @@ void main() {
       await manager.save(
         const SessionCredentials(id: 'restore-user', password: 'restore-pass'),
       );
-      await File('${tempDir.path}/auth-session.json').delete();
+      final metadataFilePath = '${tempDir.path}/auth-session.json';
+      await _closeFakeDaemon(metadataFilePath);
+      expect(await File(metadataFilePath).exists(), isFalse);
 
       expect(await manager.hasSession(), isTrue);
       final credentials = await manager.load();
@@ -109,10 +104,11 @@ void main() {
       expect(credentials, isNotNull);
       expect(credentials!.id, 'restore-user');
       expect(credentials.password, 'restore-pass');
-      expect(await File('${tempDir.path}/auth-session.json').exists(), isTrue);
+      expect(await File(metadataFilePath).exists(), isTrue);
+
+      await manager.clear();
     },
     timeout: const Timeout(Duration(minutes: 5)),
-    skip: 'Nested daemon integration is covered by manual CLI QA.',
   );
 
   test('failed daemon startup rolls back durable credentials', () async {
@@ -132,10 +128,11 @@ void main() {
     final manager = LocalAuthSessionManager(
       stateDirectory: tempDir,
       credentialStore: store,
-      daemonLauncher: (_) => Process.start('/bin/sh', <String>[
-        '-c',
-        'exit 1',
-      ], mode: ProcessStartMode.detachedWithStdio),
+      daemonLauncher: (_) async => throw const CliException(
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to start reusable auth session.',
+        exitCode: ExitCodes.software,
+      ),
     );
 
     await expectLater(
@@ -151,66 +148,238 @@ void main() {
 
 SessionDaemonLauncher _fakeDaemonLauncher(SessionCredentials credentials) {
   return (metadataFilePath) async {
+    final process = _FakeDaemonProcess();
     final metadataFile = File(metadataFilePath);
-    final token = 'test-token';
-    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    final metadata = AuthSessionMetadata(
-      schemaVersion: '1.0',
-      port: server.port,
-      token: token,
-      pid: pid,
-      createdAt: DateTime.now().toIso8601String(),
-    );
+    HttpServer? server;
+    var closed = false;
 
-    await metadataFile.parent.create(recursive: true);
-    if (!Platform.isWindows) {
-      await Process.run('chmod', <String>['700', metadataFile.parent.path]);
+    Future<bool> abortBootstrapIfClosed() async {
+      if (!closed) {
+        return false;
+      }
+      final currentServer = server;
+      server = null;
+      if (currentServer != null) {
+        unawaited(currentServer.close(force: true));
+      }
+      return true;
     }
-    await metadataFile.writeAsString(metadata.encode());
-    if (!Platform.isWindows) {
-      await Process.run('chmod', <String>['600', metadataFile.path]);
+
+    Future<void> closeDaemon({bool deleteMetadata = true}) async {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      final currentServer = server;
+      server = null;
+      if (currentServer != null) {
+        unawaited(currentServer.close(force: true));
+      }
+      if (deleteMetadata) {
+        try {
+          if (await metadataFile.exists()) {
+            await metadataFile.delete();
+          }
+        } on PathNotFoundException {
+          // logout may remove the metadata file before teardown does
+        }
+      }
+      if (identical(
+        _fakeDaemonClosersByMetadataPath[metadataFilePath],
+        closeDaemon,
+      )) {
+        _fakeDaemonClosersByMetadataPath.remove(metadataFilePath);
+      }
+      await process.complete();
     }
+
+    addTearDown(closeDaemon);
+    _fakeDaemonClosersByMetadataPath[metadataFilePath] = closeDaemon;
 
     unawaited(() async {
-      await for (final request in server) {
-        if (request.headers.value(HttpHeaders.authorizationHeader) !=
-            'Bearer $token') {
-          request.response.statusCode = HttpStatus.unauthorized;
-          await request.response.close();
-          continue;
+      try {
+        final payload = await process.readStdin();
+        if (await abortBootstrapIfClosed()) {
+          return;
+        }
+        final decoded = SessionCredentials.fromJson(
+          (jsonDecode(payload) as Map<String, dynamic>).cast<String, Object?>(),
+        );
+        if (decoded.id != credentials.id ||
+            decoded.password != credentials.password) {
+          throw StateError('Fake daemon received unexpected credentials.');
         }
 
-        switch ('${request.method} ${request.uri.path}') {
-          case 'GET /v1/status':
-            request.response.headers.contentType = ContentType.json;
-            request.response.write(jsonEncode(<String, Object?>{'ok': true}));
-            await request.response.close();
-            break;
-          case 'GET /v1/credentials':
-            request.response.headers.contentType = ContentType.json;
-            request.response.write(jsonEncode(credentials.toJson()));
-            await request.response.close();
-            break;
-          case 'POST /v1/logout':
-            request.response.headers.contentType = ContentType.json;
-            request.response.write(jsonEncode(<String, Object?>{'ok': true}));
-            await request.response.close();
-            await server.close(force: true);
-            if (await metadataFile.exists()) {
-              await metadataFile.delete();
-            }
-            break;
-          default:
-            request.response.statusCode = HttpStatus.notFound;
-            await request.response.close();
-            break;
+        const token = 'test-token-for-session-manager-lifecycle-123';
+        server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        if (await abortBootstrapIfClosed()) {
+          return;
         }
+        final metadata = AuthSessionMetadata(
+          schemaVersion: '1.0',
+          port: server!.port,
+          token: token,
+          pid: process.pid,
+          createdAt: DateTime.now().toIso8601String(),
+        );
+
+        await metadataFile.parent.create(recursive: true);
+        if (!Platform.isWindows) {
+          await Process.run('chmod', <String>['700', metadataFile.parent.path]);
+        }
+        final tempFile = File('${metadataFile.path}.tmp.${process.pid}');
+        await tempFile.writeAsString(metadata.encode());
+        if (!Platform.isWindows) {
+          await Process.run('chmod', <String>['600', tempFile.path]);
+        }
+        await tempFile.rename(metadataFile.path);
+        if (!Platform.isWindows) {
+          await Process.run('chmod', <String>['600', metadataFile.path]);
+        }
+        if (await abortBootstrapIfClosed()) {
+          return;
+        }
+
+        server!.listen((request) {
+          unawaited(() async {
+            if (request.headers.value(HttpHeaders.authorizationHeader) !=
+                'Bearer $token') {
+              request.response.statusCode = HttpStatus.unauthorized;
+              await request.response.close();
+              return;
+            }
+
+            switch ('${request.method} ${request.uri.path}') {
+              case 'GET /v1/status':
+                request.response.headers.contentType = ContentType.json;
+                request.response.write(
+                  jsonEncode(<String, Object?>{'ok': true}),
+                );
+                await request.response.close();
+                break;
+              case 'GET /v1/credentials':
+                request.response.headers.contentType = ContentType.json;
+                request.response.write(jsonEncode(credentials.toJson()));
+                await request.response.close();
+                break;
+              case 'POST /v1/logout':
+                request.response.headers.contentType = ContentType.json;
+                request.response.write(
+                  jsonEncode(<String, Object?>{'ok': true}),
+                );
+                await request.response.close();
+                unawaited(closeDaemon(deleteMetadata: false));
+                break;
+              default:
+                request.response.statusCode = HttpStatus.notFound;
+                await request.response.close();
+                break;
+            }
+          }());
+        });
+      } catch (error) {
+        await process.fail(error.toString());
+        await closeDaemon();
       }
     }());
 
-    return Process.start('/bin/sh', <String>[
-      '-c',
-      'cat >/dev/null; sleep 60',
-    ], mode: ProcessStartMode.detachedWithStdio);
+    return process;
   };
+}
+
+Future<void> _closeFakeDaemon(String metadataFilePath) async {
+  final closeDaemon = _fakeDaemonClosersByMetadataPath[metadataFilePath];
+  if (closeDaemon != null) {
+    await closeDaemon();
+  }
+}
+
+Future<void> _expectOwnerOnlyUnixPermissions(
+  String path, {
+  required bool isDirectory,
+}) async {
+  final mode = (await FileStat.stat(path)).modeString();
+  final pattern = isDirectory
+      ? RegExp(r'^[a-z-]?rwx------$')
+      : RegExp(r'^[a-z-]?rw-------$');
+  expect(
+    mode,
+    matches(pattern),
+    reason:
+        'Expected ${isDirectory ? 'directory' : 'file'} permissions to be owner-only, got $mode for $path.',
+  );
+}
+
+final class _FakeDaemonProcess implements Process {
+  _FakeDaemonProcess()
+    : _stdinController = StreamController<List<int>>(),
+      _stdoutController = StreamController<List<int>>(),
+      _stderrController = StreamController<List<int>>(),
+      pid = DateTime.now().microsecondsSinceEpoch {
+    stdin = IOSink(_stdinController.sink);
+  }
+
+  final StreamController<List<int>> _stdinController;
+  final StreamController<List<int>> _stdoutController;
+  final StreamController<List<int>> _stderrController;
+
+  @override
+  late final IOSink stdin;
+
+  @override
+  Stream<List<int>> get stdout => _stdoutController.stream;
+
+  @override
+  Stream<List<int>> get stderr => _stderrController.stream;
+
+  @override
+  final int pid;
+
+  final Completer<int> _exitCode = Completer<int>();
+  var _closed = false;
+
+  @override
+  Future<int> get exitCode => _exitCode.future;
+
+  Future<String> readStdin() async {
+    final payload = await utf8.decoder.bind(_stdinController.stream).join();
+    return payload.trim();
+  }
+
+  Future<void> fail(String message) async {
+    if (_closed) {
+      return;
+    }
+    _stderrController.add(utf8.encode('$message\n'));
+    await _finish(1);
+  }
+
+  Future<void> complete() => _finish(0);
+
+  Future<void> _finish(int code) {
+    if (_closed) {
+      return Future<void>.value();
+    }
+    _closed = true;
+
+    final stdinClose = stdin.close();
+    final stdoutClose = _stdoutController.close();
+    final stderrClose = _stderrController.close();
+
+    if (!_exitCode.isCompleted) {
+      _exitCode.complete(code);
+    }
+
+    unawaited(stdinClose);
+    unawaited(stdoutClose);
+    unawaited(stderrClose);
+
+    return Future<void>.value();
+  }
+
+  @override
+  bool kill([ProcessSignal signal = ProcessSignal.sigterm]) {
+    unawaited(_finish(0));
+    return true;
+  }
 }
