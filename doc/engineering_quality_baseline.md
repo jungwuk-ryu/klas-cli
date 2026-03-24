@@ -15,9 +15,11 @@ The gate script currently enforces:
 1. dependency resolution (`dart pub get`)
 2. static analysis (`dart analyze`)
 3. unit/integration test suite (`dart test`)
-4. command-contract smoke checks for:
-   - `klas --format json schema tasks list`
-   - `klas --format json --dry-run tasks show 12 --course CSE101`
+4. root schema smoke check (`dart run bin/klas.dart --format json schema`)
+5. schema smoke check (`dart run bin/klas.dart --format json schema tasks list`)
+6. dry-run smoke check (`dart run bin/klas.dart --format json --dry-run tasks show 12 --course CSE101`)
+7. installer contract tests (`dart test test/installers/install_contract_test.dart`)
+8. publish dry-run (`dart pub publish --dry-run`)
 
 ## Test Policy
 
@@ -31,9 +33,9 @@ The gate script currently enforces:
 Before release, all of the following must be true:
 
 1. CI gate is green on the release commit.
-2. `dart run tool/check_all.dart` passes locally.
-3. Install contract tests remain green (`test/installers/install_contract_test.dart`).
-4. `README.md`, `doc/json-contract.md`, and `CHANGELOG.md` match the shipped behavior.
-5. `pubspec.yaml` version and release notes are updated together.
+2. `dart run tool/check_all.dart` passes locally (includes installer contract tests and publish dry-run).
+3. `README.md`, `doc/json-contract.md`, and `CHANGELOG.md` match the shipped behavior.
+4. `pubspec.yaml` version and release notes are updated together.
+5. Operational confidence signals in `doc/operations_readiness.md` are reviewed; if you have dashboards/alerts, map them to those signals for this release.
 
-For operator steps, follow `doc/release_checklist.md`.
+For operator steps, follow `doc/release_checklist.md` and `doc/operations_readiness.md`.
