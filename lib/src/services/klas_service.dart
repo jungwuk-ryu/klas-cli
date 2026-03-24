@@ -279,6 +279,13 @@ final class KlasflowService implements KlasService {
           courses.map(_loadTasksForCourseSafely),
         );
 
+        if (_everyCourseLoadFailed(results.map((result) => result.failure))) {
+          throw _allCoursesFailedException(
+            resourceName: 'tasks',
+            failures: results.map((result) => result.failure!),
+          );
+        }
+
         for (final result in results) {
           if (result.warning != null) {
             warnings.add(result.warning!);
@@ -398,6 +405,13 @@ final class KlasflowService implements KlasService {
         final results = await Future.wait(
           courses.map(_loadNoticesForCourseSafely),
         );
+
+        if (_everyCourseLoadFailed(results.map((result) => result.failure))) {
+          throw _allCoursesFailedException(
+            resourceName: 'notices',
+            failures: results.map((result) => result.failure!),
+          );
+        }
 
         for (final result in results) {
           if (result.warning != null) {
@@ -802,11 +816,13 @@ final class KlasflowService implements KlasService {
         tasks: await _loadAllTasks(course),
       );
     } catch (error) {
+      final failure = ErrorMapper().map(error);
       return _CourseTaskLoadResult(
         course: course,
         tasks: const <KlasTask>[],
         warning:
-            'Failed to load tasks for ${course.title ?? course.courseId}: ${_describeWarning(error)}',
+            'Failed to load tasks for ${course.title ?? course.courseId}: ${failure.message}',
+        failure: failure,
       );
     }
   }
@@ -820,11 +836,13 @@ final class KlasflowService implements KlasService {
         notices: await _loadAllNotices(course),
       );
     } catch (error) {
+      final failure = ErrorMapper().map(error);
       return _CourseNoticeLoadResult(
         course: course,
         notices: const <KlasBoardPostSummary>[],
         warning:
-            'Failed to load notices for ${course.title ?? course.courseId}: ${_describeWarning(error)}',
+            'Failed to load notices for ${course.title ?? course.courseId}: ${failure.message}',
+        failure: failure,
       );
     }
   }
@@ -835,11 +853,13 @@ final class _CourseTaskLoadResult {
     required this.course,
     required this.tasks,
     this.warning,
+    this.failure,
   });
 
   final KlasCourse course;
   final List<KlasTask> tasks;
   final String? warning;
+  final CliException? failure;
 }
 
 final class _CourseNoticeLoadResult {
@@ -847,11 +867,13 @@ final class _CourseNoticeLoadResult {
     required this.course,
     required this.notices,
     this.warning,
+    this.failure,
   });
 
   final KlasCourse course;
   final List<KlasBoardPostSummary> notices;
   final String? warning;
+  final CliException? failure;
 }
 
 final class _ResolvedCredentials {
@@ -928,8 +950,38 @@ String? _normalizeDateTime(String? value) {
   return raw;
 }
 
-String _describeWarning(Object error) {
-  return ErrorMapper().map(error).message;
+bool _everyCourseLoadFailed(Iterable<CliException?> failures) {
+  final failureList = failures.toList(growable: false);
+  return failureList.isNotEmpty &&
+      failureList.every((failure) => failure != null);
+}
+
+CliException _allCoursesFailedException({
+  required String resourceName,
+  required Iterable<CliException> failures,
+}) {
+  final failureList = failures.toList(growable: false);
+  final first = failureList.first;
+
+  if (failureList.every((failure) => failure.code == first.code)) {
+    return CliException(
+      code: first.code,
+      message: 'Failed to load $resourceName for every selected course.',
+      exitCode: first.exitCode,
+      retryable: first.retryable,
+      hint:
+          first.hint ??
+          'Try the command again later or narrow the request with --course.',
+    );
+  }
+
+  return CliException(
+    code: 'INTERNAL_ERROR',
+    message: 'Failed to load $resourceName for every selected course.',
+    exitCode: ExitCodes.software,
+    hint:
+        'Try the command again later or narrow the request with --course to isolate the failing course.',
+  );
 }
 
 int _compareTaskViews(TaskView left, TaskView right) {
