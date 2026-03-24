@@ -43,6 +43,16 @@ klas calendar month [--year <year>] [--month <month>]
 klas schema [command ...]
 ```
 
+### 1.0.0에 포함되지 않는 명령어
+
+아래 명령어는 `1.0.0`에 포함되지 않습니다(비목표/보류).
+
+- `klas tasks due`
+- `klas tasks overdue`
+- `klas notices show`
+- `klas progress ...`
+- `klas files ...`
+
 ## 로그인 방법
 
 가장 쉬운 방법으로는 `auth login` 명령을 이용하시면 됩니다.
@@ -151,6 +161,8 @@ klas --format json --dry-run tasks show 12 --course CSE101
 
 `tasks list`, `notices list`처럼 여러 과목을 한 번에 훑는 명령은 일부 과목 조회에 실패해도 전체를 중단하지 않고 `warnings`와 함께 부분 결과를 돌려줄 수 있습니다.
 
+이때 일부 과목만 실패한 경우에는 성공으로 처리하면서 가능한 결과는 `data`에 담고, 실패한 과목은 `warnings`로 알려줍니다. 반대로 선택된 과목 조회가 전부 실패하면 `warnings`만 남긴 채 성공 응답을 만들지 않고, top-level 구조화 오류(`ok: false`)를 반환합니다.
+
 ## 종료 코드
 
 - `0`: 성공
@@ -180,6 +192,7 @@ dart run bin/klas.dart --format json --dry-run calendar month --year 2026 --mont
 ## 관련 문서
 
 - `doc/engineering_quality_baseline.md`
+- `doc/operations_readiness.md`
 - `doc/release_checklist.md`
 - `doc/json-contract.md`
 - `CHANGELOG.md`

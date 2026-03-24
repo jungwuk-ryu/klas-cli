@@ -39,17 +39,27 @@ If the upstream capability is incomplete, either:
 
 ## Command design contract
 
-The target command tree is:
+The shipped `1.0.0` command tree is:
 
 - `klas auth login|status|logout`
 - `klas me profile`
 - `klas courses list|show`
-- `klas tasks list|due|overdue|show`
-- `klas notices list|show`
+- `klas tasks list|show`
+- `klas notices list`
 - `klas timetable week`
 - `klas calendar month`
-- `klas progress by-course|show`
-- `klas files list|download`
+- `klas schema [command ...]`
+
+### Not in 1.0.0
+
+The following commands are explicitly deferred (non-goals) for `1.0.0` and must not
+be listed as shipped until they are implemented and verified against `klasflow`:
+
+- `klas tasks due`
+- `klas tasks overdue`
+- `klas notices show`
+- `klas progress ...`
+- `klas files ...`
 
 Adjust only when correctness requires it.
 If you remove or narrow a command, explain why in docs and in the final report.
@@ -70,7 +80,7 @@ A stable JSON envelope is preferred:
 {
   "ok": true,
   "schema_version": "1.0",
-  "command": "tasks due",
+  "command": "tasks list",
   "data": [],
   "meta": {},
   "warnings": []
@@ -81,10 +91,13 @@ Errors must be structured and machine-actionable.
 Use stable string codes such as:
 
 - `AUTH_REQUIRED`
+- `AUTH_INVALID_CREDENTIALS`
 - `AUTH_EXPIRED`
 - `NETWORK_ERROR`
 - `COURSE_NOT_FOUND`
 - `TASK_NOT_FOUND`
+- `AMBIGUOUS_INPUT`
+- `USAGE_ERROR`
 - `UNSUPPORTED_FEATURE`
 - `INTERNAL_ERROR`
 

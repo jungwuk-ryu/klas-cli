@@ -61,7 +61,7 @@ Prefer `--format json` for any agent workflow.
 
 When you only need a subset of fields, add `--fields` to reduce context usage.
 
-Use `schema` to inspect the command contract at runtime before guessing flags or output fields.
+Use `schema` to inspect the command contract at runtime before guessing flags, subcommands, or output fields.
 
 ## Execution rule
 
@@ -138,7 +138,7 @@ klas --format json calendar month --year 2026 --month 3
 
 ## Interpretation rules
 
-- `tasks list` is the truthful replacement for "remaining assignments" in v1. Do not invent overdue semantics unless the CLI adds dedicated overdue commands later.
+- `tasks list` is the truthful replacement for "remaining assignments" in v1. There are no `tasks due` / `tasks overdue` commands in v1, so do not invent overdue semantics; instead, interpret `due_at` from `tasks list` and clearly label any client-side filtering as derived.
 - Reuse `course_id` from `tasks list` when a follow-up `tasks show` call needs `--course`.
 - `timetable week` is timetable-based recurring class data.
 - `calendar month` is the direct monthly schedule table view.
@@ -151,6 +151,8 @@ klas --format json calendar month --year 2026 --month 3
 
 ## Do not assume
 
+- no `tasks due` command in v1
+- no `tasks overdue` command in v1
 - no `progress` commands in v1
 - no `files` commands in v1
 - no `notices show` in v1
