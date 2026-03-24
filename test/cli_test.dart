@@ -24,6 +24,7 @@ void main() {
               ),
             ],
             meta: const <String, Object?>{'count': 1},
+            warnings: const <String>['One course could not be refreshed.'],
           ),
     );
 
@@ -37,9 +38,14 @@ void main() {
     final payload =
         jsonDecode(terminal.outLines.single) as Map<String, dynamic>;
     expect(payload['ok'], isTrue);
+    expect(payload['schema_version'], '1.0');
     expect(payload['command'], 'courses list');
     expect(payload['meta']['count'], 1);
+    expect(payload['warnings'], <dynamic>[
+      'One course could not be refreshed.',
+    ]);
     expect(payload['data'][0]['course_id'], 'CSE101');
+    expect(terminal.errLines, isEmpty);
   });
 
   test('profile auth failure prints structured JSON error', () async {
@@ -63,8 +69,13 @@ void main() {
     final payload =
         jsonDecode(terminal.outLines.single) as Map<String, dynamic>;
     expect(payload['ok'], isFalse);
+    expect(payload['schema_version'], '1.0');
     expect(payload['command'], 'me profile');
+    expect(payload['data'], isNull);
     expect(payload['error']['code'], 'AUTH_REQUIRED');
+    expect(payload['meta'], isEmpty);
+    expect(payload['warnings'], isEmpty);
+    expect(terminal.errLines, isEmpty);
   });
 
   test('tasks show validates integer task number', () async {
@@ -184,6 +195,39 @@ void main() {
     expect(payload['data']['supports_dry_run'], isTrue);
   });
 
+  test('schema root freezes the reduced 1.0.0 top-level surface', () async {
+    final terminal = FakeTerminal();
+
+    final exitCode = await runKlasCli(
+      <String>['--format', 'json', 'schema'],
+      terminal: terminal,
+      service: FakeKlasService(),
+    );
+
+    expect(exitCode, ExitCodes.success);
+    final payload =
+        jsonDecode(terminal.outLines.single) as Map<String, dynamic>;
+    final commands = (payload['data']['commands'] as List<dynamic>)
+        .map((entry) => (entry as Map<String, dynamic>)['path'] as String)
+        .map((path) => path.split(' ').first)
+        .toSet();
+    expect(payload['ok'], isTrue);
+    expect(payload['data']['path'], 'klas');
+    expect(
+      commands,
+      unorderedEquals(<String>[
+        'auth',
+        'me',
+        'courses',
+        'tasks',
+        'notices',
+        'timetable',
+        'calendar',
+        'schema',
+      ]),
+    );
+  });
+
   test('schema timetable lists week subcommand', () async {
     final terminal = FakeTerminal();
 
@@ -214,6 +258,25 @@ void main() {
     expect(payload['data']['subcommands'], <dynamic>['calendar month']);
   });
 
+  test(
+    'schema notices lists only the shipped notices list subcommand',
+    () async {
+      final terminal = FakeTerminal();
+
+      final exitCode = await runKlasCli(
+        <String>['--format', 'json', 'schema', 'notices'],
+        terminal: terminal,
+        service: FakeKlasService(),
+      );
+
+      expect(exitCode, ExitCodes.success);
+      final payload =
+          jsonDecode(terminal.outLines.single) as Map<String, dynamic>;
+      expect(payload['data']['path'], 'notices');
+      expect(payload['data']['subcommands'], <dynamic>['notices list']);
+    },
+  );
+
   test('schema schedule path is removed from the canonical surface', () async {
     final terminal = FakeTerminal();
 
@@ -231,6 +294,58 @@ void main() {
       payload['error']['message'],
       contains('No schema entry matched the requested command path'),
     );
+  });
+
+  test('deferred commands fail through the stable usage boundary', () async {
+    const cases = <({List<String> arguments, String command, String token})>[
+      (
+        arguments: <String>['progress', 'by-course'],
+        command: 'progress by-course',
+        token: 'progress',
+      ),
+      (
+        arguments: <String>['files', 'list'],
+        command: 'files list',
+        token: 'files',
+      ),
+      (arguments: <String>['tasks', 'due'], command: 'tasks due', token: 'due'),
+      (
+        arguments: <String>['tasks', 'overdue'],
+        command: 'tasks overdue',
+        token: 'overdue',
+      ),
+      (
+        arguments: <String>['notices', 'show'],
+        command: 'notices show',
+        token: 'show',
+      ),
+    ];
+
+    for (final commandCase in cases) {
+      final terminal = FakeTerminal();
+
+      final exitCode = await runKlasCli(
+        <String>['--format', 'json', ...commandCase.arguments],
+        terminal: terminal,
+        service: FakeKlasService(),
+      );
+
+      expect(exitCode, ExitCodes.usage, reason: commandCase.command);
+      final payload =
+          jsonDecode(terminal.outLines.single) as Map<String, dynamic>;
+      expect(payload['ok'], isFalse, reason: commandCase.command);
+      expect(payload['command'], commandCase.command);
+      expect(payload['error']['code'], 'USAGE_ERROR');
+      expect(
+        payload['error']['message'],
+        allOf(
+          contains('Could not find a'),
+          contains('named'),
+          contains(commandCase.token),
+        ),
+      );
+      expect(payload['error']['hint'], contains('--help'));
+    }
   });
 
   test(
@@ -331,6 +446,7 @@ void main() {
                 isDefault: true,
               ),
             ],
+            meta: const <String, Object?>{'count': 1},
           ),
     );
 
@@ -350,11 +466,15 @@ void main() {
     expect(exitCode, ExitCodes.success);
     final payload =
         jsonDecode(terminal.outLines.single) as Map<String, dynamic>;
+    expect(payload['schema_version'], '1.0');
     expect(
       payload['data'][0].keys,
       unorderedEquals(<String>['course_id', 'title']),
     );
+    expect(payload['meta']['count'], 1);
     expect(payload['meta']['fields'], <dynamic>['course_id', 'title']);
+    expect(payload['warnings'], isEmpty);
+    expect(terminal.errLines, isEmpty);
   });
 
   test('dry-run validates without calling the service', () async {
@@ -377,9 +497,14 @@ void main() {
     expect(called, isFalse);
     final payload =
         jsonDecode(terminal.outLines.single) as Map<String, dynamic>;
+    expect(payload['schema_version'], '1.0');
     expect(payload['data']['validated'], isTrue);
+    expect(payload['data']['command'], 'courses list');
     expect(payload['meta']['dry_run'], isTrue);
     expect(payload['meta']['network_call'], isFalse);
+    expect(payload['meta']['auth_required'], isTrue);
+    expect(payload['warnings'], isEmpty);
+    expect(terminal.errLines, isEmpty);
   });
 
   test(
