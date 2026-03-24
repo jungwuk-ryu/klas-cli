@@ -42,7 +42,8 @@ Error responses replace `data` with `null` and include an `error` object:
 - `command`: stable command identity, such as `tasks list`
 - `data`: normalized CLI-facing payload
 - `meta`: command-level metadata such as counts or execution basis
-- `warnings`: partial-failure or caution messages
+- `warnings`: non-fatal issues or partial failures, always check `ok` first
+- Fan-out rule: for commands that query multiple courses, return `ok=true` with usable `data` plus `warnings` if at least one course succeeds; if all selected courses fail, return a top-level structured error (`ok=false`)
 - `error.code`: machine-actionable stable string
 - `error.message`: human-readable description
 - `error.retryable`: whether retrying may succeed
@@ -71,6 +72,7 @@ Error responses replace `data` with `null` and include an `error` object:
 - `TASK_NOT_FOUND`
 - `AMBIGUOUS_INPUT`
 - `USAGE_ERROR`
+- `UNSUPPORTED_FEATURE`
 - `INTERNAL_ERROR`
 
 ## stdout and stderr rules

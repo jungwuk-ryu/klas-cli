@@ -35,6 +35,13 @@
 - Why this is better here: `timetable week` maps to the verified semester timetable API, and `calendar month` maps directly to the verified monthly schedule table API, so the command tree now follows real data domains instead of mixing them behind one noun.
 - Remaining risk: the CLI no longer offers a blended daily view, so users who want a combined “today” view must query timetable and calendar separately.
 
+## 1.0.0 release scope hardening
+
+- Chosen option: treat `1.0.0` as a scope-hardening release that freezes the already shipped reduced surface and explicitly defers unverified or misleading breadth (such as `tasks due|overdue`, `notices show`, `progress`, and `files`).
+- Alternatives considered: expanding the command tree to include all requested convenience commands; shipping placeholder commands that return partial or best-effort data; documenting a broader surface than the runtime actually supports.
+- Why this is better here: this CLI is agent-first and its documented output is a public contract, so `1.0.0` must prioritize trust, stable automation, and truthful scope over breadth; deferring ambiguous domains (notably progress semantics and file handling) avoids shipping commands that look complete but are not reliably backed by `klasflow`.
+- Remaining risk: users will still want overdue/progress/files workflows, so the project must either validate upstream capability and implement them with a clear contract later, or continue to be explicit about the gap.
+
 ## Session persistence scope
 
 - Chosen option: keep the local reusable daemon session, but back it with durable encrypted credentials so the daemon can be recreated after reboot or local process loss.
