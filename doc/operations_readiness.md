@@ -18,6 +18,13 @@ This guide covers:
 
 This guide does not define infrastructure, dashboards, or paging. If you do have those, map the signals in this doc into your tooling.
 
+## Branching model for operations
+
+- `develop` is the integration branch for day-to-day work.
+- Feature, fix, and chore changes should arrive through short-lived branches based on `develop`.
+- `main` is the canonical release branch when a single release branch name is needed in hosting or automation.
+- If a release hotfix lands on `main`/`master`, merge it back into `develop` before the next routine development cycle continues.
+
 ## Primary release confidence gate
 
 The single best automated signal is the CI aligned gate script:
@@ -85,6 +92,16 @@ dart pub publish --dry-run
 ```
 
 Operator rule: if the dry-run starts failing for a release candidate, stop and fix the package metadata or content drift before publishing.
+
+### Release branch promotion
+
+Before promoting a release to `main`/`master`, confirm:
+
+- the candidate was validated on `develop`
+- version and `CHANGELOG.md` updates are included in the release candidate
+- installer entrypoints still reflect the intended stable release channel
+
+After a release or release hotfix, confirm the same commit content is merged back into `develop` or that an equivalent follow-up commit has restored branch parity.
 
 ### Auth and session regression signals
 

@@ -90,3 +90,10 @@
 - Alternatives considered: stopping after installation; forcing environment-variable login only; adding an installer-only command inside the CLI.
 - Why this is better here: it satisfies the request to continue into login without changing the CLI command surface, and it handles the `curl ... | bash` stdin redirection case truthfully.
 - Remaining risk: interactive login still depends on a real terminal or pre-supplied `KLAS_ID` and `KLAS_PASSWORD`.
+
+## Branching strategy
+
+- Chosen option: use `develop` as the integration branch, require short-lived working branches for day-to-day changes, and keep `main`/`master` release-only.
+- Alternatives considered: trunk-based development directly on `main`; long-lived feature branches; keeping `main` as both development and release branch.
+- Why this is better here: it separates ongoing integration from the public release channel, keeps release-oriented installer/docs references stable on `main`, and reduces accidental non-release work landing on the release branch.
+- Remaining risk: the remote default branch and branch protections must still be kept in sync outside the repository contents, or contributors may continue opening changes against the wrong branch.

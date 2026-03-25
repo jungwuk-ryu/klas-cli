@@ -4,7 +4,7 @@ This document defines the minimum quality baseline for `klas-cli` before wider r
 
 ## CI Gates (Blocking)
 
-All pull requests and direct pushes to `main`/`master` must pass `.github/workflows/ci.yml`.
+All pull requests, direct pushes to `develop`, and release-only pushes to `main`/`master` must pass `.github/workflows/ci.yml`.
 
 The workflow runs:
 

@@ -26,6 +26,13 @@ klas --help
 klas auth status
 ```
 
+## 개발 브랜치 규칙
+
+- `develop`를 통합 브랜치로 사용합니다.
+- 기능 개발, 버그 수정, 문서 작업은 모두 `develop`에서 분기한 short-lived branch에서 진행합니다.
+- 일상적인 작업은 short-lived branch -> `develop` 흐름으로 병합합니다.
+- `main`/`master`는 release-only 브랜치로 유지하고, 릴리스 반영이나 긴급 릴리스 수정에만 사용합니다.
+
 ## 제공하는 명령어
 
 ```text

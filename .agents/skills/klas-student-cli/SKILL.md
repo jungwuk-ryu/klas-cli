@@ -25,6 +25,8 @@ Use this skill when a student or agent needs read-only KLAS information from the
 
 Install the CLI first when `klas` is not already available:
 
+The raw GitHub URLs intentionally point at `main` as the stable release channel, while day-to-day development happens on `develop` and short-lived branches.
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/jungwuk-ryu/klas-cli/main/install.sh | bash
 ```

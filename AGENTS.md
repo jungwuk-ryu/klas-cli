@@ -71,6 +71,15 @@ If you remove or narrow a command, explain why in docs and in the final report.
 - Make top-level help and subcommand help genuinely informative.
 - Design commands around stable information domains, not natural-language intent parsing.
 
+## Git workflow
+
+Use `develop` as the main integration branch.
+
+- Start day-to-day work from short-lived branches cut from `develop`.
+- Merge feature, fix, and chore branches back into `develop` after review and validation.
+- Treat `main`/`master` as release-only branches; reserve them for release commits, release promotion, and clearly scoped release hotfixes.
+- Do not use `main`/`master` as the normal destination for everyday development work.
+
 ## Output contract
 
 Every command must support a machine-readable mode.
