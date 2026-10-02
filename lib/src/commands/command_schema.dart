@@ -281,7 +281,10 @@ const Map<String, CommandContract> commandContracts = <String, CommandContract>{
       'submission_status',
       'report_title',
       'report_html',
+      'report_text',
       'submission_text',
+      'attachments',
+      'submission_attachments',
     ],
     options: <CommandOptionSchema>[
       CommandOptionSchema(
@@ -293,10 +296,12 @@ const Map<String, CommandContract> commandContracts = <String, CommandContract>{
   ),
   'tasks show': CommandContract(
     path: 'tasks show',
-    description: 'Show one task by task number, optionally narrowed by course.',
+    description:
+        'Show a task body and attachments, optionally narrowed by course.',
     authRequired: true,
     supportsDryRun: true,
     supportsFields: true,
+    warningsPossible: true,
     outputFields: <String>[
       'course_id',
       'course_title',
@@ -308,7 +313,10 @@ const Map<String, CommandContract> commandContracts = <String, CommandContract>{
       'submission_status',
       'report_title',
       'report_html',
+      'report_text',
       'submission_text',
+      'attachments',
+      'submission_attachments',
     ],
     arguments: <CommandArgumentSchema>[
       CommandArgumentSchema(
@@ -323,14 +331,26 @@ const Map<String, CommandContract> commandContracts = <String, CommandContract>{
         type: 'string',
         description: 'Exact course id or exact course title.',
       ),
+      CommandOptionSchema(
+        name: '--download-dir',
+        type: 'string',
+        description:
+            'Save task and submission attachments in a new subdirectory here.',
+      ),
+    ],
+    notes: <String>[
+      'Attachment objects contain file_name, size_bytes, and local_path.',
+      'Without --download-dir, attachments are listed and local_path is null.',
+      'Attachment failures preserve the body and appear in warnings.',
+      '--dry-run does not create files or directories.',
     ],
   ),
   'notices': CommandContract(
     path: 'notices',
-    description: 'List course notices.',
+    description: 'List course notices and read their bodies and attachments.',
     supportsFields: false,
     outputFields: <String>[],
-    subcommands: <String>['notices list'],
+    subcommands: <String>['notices list', 'notices show'],
   ),
   'notices list': CommandContract(
     path: 'notices list',
@@ -348,6 +368,9 @@ const Map<String, CommandContract> commandContracts = <String, CommandContract>{
       'posted_at',
       'has_attachments',
       'file_count',
+      'content_html',
+      'content_text',
+      'attachments',
     ],
     options: <CommandOptionSchema>[
       CommandOptionSchema(
@@ -355,6 +378,53 @@ const Map<String, CommandContract> commandContracts = <String, CommandContract>{
         type: 'string',
         description: 'Exact course id or exact course title.',
       ),
+    ],
+  ),
+  'notices show': CommandContract(
+    path: 'notices show',
+    description: 'Show a notice body and attachments in one course.',
+    authRequired: true,
+    supportsDryRun: true,
+    warningsPossible: true,
+    outputFields: <String>[
+      'course_id',
+      'course_title',
+      'board_no',
+      'title',
+      'author_name',
+      'posted_at',
+      'has_attachments',
+      'file_count',
+      'content_html',
+      'content_text',
+      'attachments',
+    ],
+    arguments: <CommandArgumentSchema>[
+      CommandArgumentSchema(
+        name: 'board_no',
+        type: 'integer',
+        description:
+            'Notice number from `notices list` in the selected course.',
+      ),
+    ],
+    options: <CommandOptionSchema>[
+      CommandOptionSchema(
+        name: '--course',
+        type: 'string',
+        required: true,
+        description: 'Exact course id or exact course title.',
+      ),
+      CommandOptionSchema(
+        name: '--download-dir',
+        type: 'string',
+        description: 'Save attachments in a new subdirectory here.',
+      ),
+    ],
+    notes: <String>[
+      'Attachment objects contain file_name, size_bytes, and local_path.',
+      'Without --download-dir, attachments are listed and local_path is null.',
+      'Attachment failures preserve the body and appear in warnings.',
+      '--dry-run does not create files or directories.',
     ],
   ),
   'timetable': CommandContract(

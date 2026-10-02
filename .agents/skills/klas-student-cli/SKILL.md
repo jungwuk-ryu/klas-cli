@@ -1,6 +1,6 @@
 ---
 name: klas-student-cli
-description: Use the local KLAS Dart CLI to answer read-only student questions about auth, courses, tasks, notices, timetable, and calendar. Prefer JSON output.
+description: Use the local KLAS Dart CLI to answer read-only student questions about auth, courses, task and notice bodies and attachments, timetable, and calendar. Prefer JSON output.
 compatibility: opencode
 metadata:
   audience: personal-agent
@@ -107,6 +107,7 @@ klas --format json --fields course_id,task_no,title tasks list
 
 ```bash
 klas --format json tasks show 12 --course "CSE101"
+klas --format json --fields report_text,attachments,submission_attachments tasks show 12 --course "CSE101"
 ```
 
 ### List notices
@@ -114,6 +115,18 @@ klas --format json tasks show 12 --course "CSE101"
 ```bash
 klas --format json notices list
 ```
+
+### Read one notice and save attachments
+
+```bash
+klas --format json notices show 7 --course "CSE101"
+klas --format json notices show 7 --course "CSE101" --download-dir ./downloads
+klas --format json tasks show 12 --course "CSE101" --download-dir ./downloads
+```
+
+Use `content_text` for notice bodies and `report_text` for task instructions. Original HTML remains available as `content_html` or `report_html`. `attachments` contains notice or instructor files; task `submission_attachments` contains the student's submitted files. Each file has `file_name`, `size_bytes`, and `local_path`. Only add `--download-dir` when the user needs local attachment files. After downloading, open or inspect the successful `local_path` with a suitable file viewer; the CLI does not convert binary file contents to text.
+
+Downloads occupy a unique child directory and do not overwrite existing files. Check `warnings` and each `local_path` for partial failures. Null attachment lists mean unavailable; empty lists mean no returned files. List commands do not load bodies or attachments. `--dry-run` does not download or create directories, and `--fields` only shapes output, so it does not suppress downloads. Keep private attachments outside version control.
 
 ### Filter notices or tasks to one course
 
@@ -140,6 +153,7 @@ klas --format json calendar month --year 2026 --month 3
 
 - `tasks list` is the truthful replacement for "remaining assignments" in v1. There are no `tasks due` / `tasks overdue` commands in v1, so do not invent overdue semantics; instead, interpret `due_at` from `tasks list` and clearly label any client-side filtering as derived.
 - Reuse `course_id` from `tasks list` when a follow-up `tasks show` call needs `--course`.
+- Reuse `course_id` and `board_no` from `notices list` for `notices show`; `--course` is required for notice detail.
 - `timetable week` is timetable-based recurring class data.
 - `calendar month` is the direct monthly schedule table view.
 - there is no mixed `today` command in the canonical surface.
@@ -154,6 +168,5 @@ klas --format json calendar month --year 2026 --month 3
 - no `tasks due` command in v1
 - no `tasks overdue` command in v1
 - no `progress` commands in v1
-- no `files` commands in v1
-- no `notices show` in v1
+- no standalone `files` commands; list and save attachments through `tasks show` or `notices show`
 - no student IDs in command output

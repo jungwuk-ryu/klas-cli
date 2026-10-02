@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -1049,6 +1050,537 @@ void main() {
       expect(payload.data.first.status, '학사일정');
     },
   );
+  group('course bodies and attachments', () {
+    test(
+      'notice detail targets the selected course and normalizes wrapped data',
+      () async {
+        var downloads = 0;
+        final service = _buildTwoCourseFanOutService((request) async {
+          if (request.url.path.endsWith('/BoardStdView.do')) {
+            final body = jsonDecode(request.body);
+            expect(body['selectSubj'], 'CSE102');
+            expect(body['boardNo'], '9');
+          }
+          if (request.url.path.contains('/DownloadFile/')) downloads++;
+          return _courseDetailResponse(request);
+        });
+        final result = await service.showNotice(
+          9,
+          allowPrompt: false,
+          courseSelector: '운영체제',
+        );
+        expect(result.data.courseId, 'CSE102');
+        expect(result.data.title, '시험 안내');
+        expect(result.data.authorName, '교수');
+        expect(result.data.contentHtml, '<p>강의실 &amp; 준비물</p><p>두 번째 문단</p>');
+        expect(result.data.contentText, '강의실 & 준비물\n\n두 번째 문단');
+        expect(result.data.postedAt, '2026-03-10T12:00:00');
+        expect(result.data.attachments, hasLength(2));
+        expect(result.data.attachments!.first.fileName, '안내.pdf');
+        expect(result.data.attachments!.first.sizeBytes, 3);
+        expect(
+          result.data.attachments!.every((file) => file.localPath == null),
+          isTrue,
+        );
+        expect(downloads, 0);
+        expect(result.warnings, isEmpty);
+      },
+    );
+
+    test(
+      'task detail preserves HTML and separates report and submission attachments',
+      () async {
+        var downloads = 0;
+        final service = _buildTwoCourseFanOutService((request) async {
+          if (request.url.path.endsWith('/TaskStdView.do')) {
+            final body = jsonDecode(request.body);
+            expect(body['selectSubj'], 'CSE101');
+            expect(body['ordseq'], '12');
+          }
+          if (request.url.path.contains('/DownloadFile/')) downloads++;
+          return _courseDetailResponse(request);
+        });
+        final result = await service.showTask(
+          12,
+          allowPrompt: false,
+          courseSelector: 'CSE101',
+        );
+        expect(result.data.reportHtml, '<p>알고리즘을 작성하세요.</p>');
+        expect(result.data.reportText, '알고리즘을 작성하세요.');
+        expect(result.data.submissionText, '제출했습니다.');
+        expect(result.data.attachments!.first.fileName, '안내.pdf');
+        expect(result.data.submissionAttachments!.single.fileName, '답안.zip');
+        expect(result.data.attachments!.first.localPath, isNull);
+        expect(downloads, 0);
+      },
+    );
+
+    test(
+      'notice downloads authenticated bytes and never overwrites existing files',
+      () async {
+        final root = await Directory.systemTemp.createTemp(
+          'klas-notice-download-',
+        );
+        addTearDown(() => root.delete(recursive: true));
+        final existing = File('${root.path}/안내.pdf');
+        await existing.writeAsString('existing');
+        final service = _buildTwoCourseFanOutService(_courseDetailResponse);
+        final first = await service.showNotice(
+          9,
+          allowPrompt: false,
+          courseSelector: 'CSE101',
+          downloadDirectory: root.path,
+        );
+        final second = await service.showNotice(
+          9,
+          allowPrompt: false,
+          courseSelector: 'CSE101',
+          downloadDirectory: root.path,
+        );
+        expect(await existing.readAsString(), 'existing');
+        final paths = [
+          ...first.data.attachments!,
+          ...second.data.attachments!,
+        ].map((file) => file.localPath!).toList();
+        expect(paths.toSet(), hasLength(4));
+        for (final path in paths) {
+          expect(
+            path.startsWith('${root.absolute.path}${Platform.pathSeparator}'),
+            isTrue,
+          );
+          expect(await File(path).readAsBytes(), [1, 2, 3]);
+        }
+        expect(first.warnings, isEmpty);
+      },
+    );
+
+    test(
+      'task downloads both attachment groups in distinct directories',
+      () async {
+        final root = await Directory.systemTemp.createTemp(
+          'klas-task-download-',
+        );
+        addTearDown(() => root.delete(recursive: true));
+        final result = await _buildTwoCourseFanOutService(_courseDetailResponse)
+            .showTask(
+              12,
+              allowPrompt: false,
+              courseSelector: 'CSE101',
+              downloadDirectory: root.path,
+            );
+        final report = result.data.attachments!.first.localPath!;
+        final submission = result.data.submissionAttachments!.single.localPath!;
+        expect(File(report).parent.path, isNot(File(submission).parent.path));
+        expect(await File(submission).readAsBytes(), [1, 2, 3]);
+        expect(result.warnings, isEmpty);
+      },
+    );
+
+    test(
+      'unsafe and duplicate attachment filenames stay inside the destination',
+      () async {
+        final root = await Directory.systemTemp.createTemp('klas-safe-names-');
+        addTearDown(() => root.delete(recursive: true));
+        final names = [
+          '../../outside.txt',
+          r'..\..\outside.txt',
+          'CON',
+          '..',
+          'bad:?.txt',
+          null,
+        ];
+        final service = _buildTwoCourseFanOutService((request) async {
+          if (request.url.path.endsWith('/UploadFileList.do')) {
+            return _jsonAnyResponse([
+              for (var i = 0; i < names.length; i++)
+                {'fileSn': '${i + 1}', 'orignlFileNm': names[i]},
+            ]);
+          }
+          return _courseDetailResponse(request);
+        });
+        final result = await service.showNotice(
+          9,
+          allowPrompt: false,
+          courseSelector: 'CSE101',
+          downloadDirectory: root.path,
+        );
+        final paths = result.data.attachments!
+            .map((file) => file.localPath!)
+            .toList();
+        expect(paths.toSet(), hasLength(names.length));
+        for (final path in paths) {
+          expect(
+            path.startsWith('${root.absolute.path}${Platform.pathSeparator}'),
+            isTrue,
+          );
+          expect(await File(path).exists(), isTrue);
+        }
+        expect(await File('${root.path}/outside.txt').exists(), isFalse);
+      },
+    );
+
+    test(
+      'absent attachment references do not fetch files or create a destination',
+      () async {
+        final root = await Directory.systemTemp.createTemp('klas-no-files-');
+        addTearDown(() => root.delete(recursive: true));
+        var fileCalls = 0;
+        final service = _buildTwoCourseFanOutService((request) async {
+          if (request.url.path.endsWith('/BoardStdView.do')) {
+            return _jsonResponse({
+              'board': {'boardNo': 9, 'contents': '<p>본문만</p>'},
+            });
+          }
+          if (request.url.path.endsWith('/TaskStdView.do')) {
+            return _jsonResponse({
+              'rpt': {'contents': '<p>과제 본문</p>'},
+            });
+          }
+          if (request.url.path.startsWith('/common/file/')) fileCalls++;
+          return _courseDetailResponse(request);
+        });
+        final destination = '${root.path}/uncreated';
+        final notice = await service.showNotice(
+          9,
+          allowPrompt: false,
+          courseSelector: 'CSE101',
+          downloadDirectory: destination,
+        );
+        final task = await service.showTask(
+          12,
+          allowPrompt: false,
+          courseSelector: 'CSE101',
+          downloadDirectory: destination,
+        );
+        expect(notice.data.contentText, '본문만');
+        expect(notice.data.attachments, isEmpty);
+        expect(task.data.attachments, isEmpty);
+        expect(task.data.submissionAttachments, isEmpty);
+        expect(fileCalls, 0);
+        expect(await Directory(destination).exists(), isFalse);
+      },
+    );
+
+    test(
+      'file listing failure preserves the body and sanitizes warnings',
+      () async {
+        final service = _buildTwoCourseFanOutService((request) async {
+          if (request.url.path.endsWith('/UploadFileList.do')) {
+            throw const NetworkException('private-cookie-value');
+          }
+          return _courseDetailResponse(request);
+        });
+        final result = await service.showNotice(
+          9,
+          allowPrompt: false,
+          courseSelector: 'CSE101',
+        );
+        expect(result.data.contentText, contains('강의실'));
+        expect(result.data.attachments, isNull);
+        expect(result.warnings, hasLength(1));
+        expect(result.warnings.single, contains('Failed to list'));
+        expect(result.warnings.single, isNot(contains('private-cookie-value')));
+      },
+    );
+
+    test(
+      'one attachment download failure preserves other downloads and metadata',
+      () async {
+        final root = await Directory.systemTemp.createTemp(
+          'klas-partial-files-',
+        );
+        addTearDown(() => root.delete(recursive: true));
+        final service = _buildTwoCourseFanOutService((request) async {
+          if (request.url.path.endsWith('/DownloadFile/report-files/1')) {
+            throw const NetworkException('private-file-token');
+          }
+          return _courseDetailResponse(request);
+        });
+        final result = await service.showNotice(
+          9,
+          allowPrompt: false,
+          courseSelector: 'CSE101',
+          downloadDirectory: root.path,
+        );
+        expect(result.data.contentText, contains('강의실'));
+        expect(result.data.attachments!.first.localPath, isNull);
+        expect(
+          await File(result.data.attachments!.last.localPath!).exists(),
+          isTrue,
+        );
+        expect(result.warnings.single, contains('Failed to download'));
+        expect(result.warnings.single, isNot(contains('private-file-token')));
+      },
+    );
+
+    test(
+      'invalid destination is a sanitized warning and does not lose the body',
+      () async {
+        final root = await Directory.systemTemp.createTemp(
+          'klas-invalid-directory-',
+        );
+        addTearDown(() => root.delete(recursive: true));
+        final target = File('${root.path}/file');
+        await target.writeAsString('keep');
+        final result = await _buildTwoCourseFanOutService(_courseDetailResponse)
+            .showNotice(
+              9,
+              allowPrompt: false,
+              courseSelector: 'CSE101',
+              downloadDirectory: target.path,
+            );
+        expect(result.data.contentText, contains('강의실'));
+        expect(
+          result.data.attachments!.every((file) => file.localPath == null),
+          isTrue,
+        );
+        expect(result.warnings, hasLength(2));
+        expect(result.warnings.first, contains('could not be saved'));
+        expect(await target.readAsString(), 'keep');
+      },
+    );
+
+    test(
+      'unresolved attachment references produce an explicit warning',
+      () async {
+        final service = _buildTwoCourseFanOutService(
+          (request) async => request.url.path.endsWith('/UploadFileList.do')
+              ? _jsonAnyResponse([])
+              : _courseDetailResponse(request),
+        );
+        final result = await service.showNotice(
+          9,
+          allowPrompt: false,
+          courseSelector: 'CSE101',
+        );
+        expect(result.data.attachments, isEmpty);
+        expect(result.warnings.single, contains('No files were returned'));
+      },
+    );
+
+    test(
+      'advertised files without an attachment reference remain unavailable',
+      () async {
+        final service = _buildTwoCourseFanOutService(
+          (request) async => request.url.path.endsWith('/BoardStdView.do')
+              ? _jsonResponse({
+                  'board': {'boardNo': 9, 'content': '본문', 'fileCnt': 1},
+                })
+              : _courseDetailResponse(request),
+        );
+        final result = await service.showNotice(
+          9,
+          allowPrompt: false,
+          courseSelector: 'CSE101',
+        );
+        expect(result.data.contentText, '본문');
+        expect(result.data.hasAttachments, isTrue);
+        expect(result.data.attachments, isNull);
+        expect(
+          result.warnings.single,
+          contains('did not return an attachment reference'),
+        );
+      },
+    );
+
+    test(
+      'missing notice and wrong notice identity return NOTICE_NOT_FOUND',
+      () async {
+        for (final response in <Map<String, dynamic>>[
+          {},
+          {'board': <String, dynamic>{}},
+          {
+            'board': {'boardNo': 10, 'title': '다른 공지'},
+          },
+        ]) {
+          final service = _buildTwoCourseFanOutService(
+            (request) async => request.url.path.endsWith('/BoardStdView.do')
+                ? _jsonResponse(response)
+                : _courseDetailResponse(request),
+          );
+          await expectLater(
+            service.showNotice(9, allowPrompt: false, courseSelector: 'CSE101'),
+            throwsA(
+              isA<CliException>().having(
+                (error) => error.code,
+                'code',
+                'NOTICE_NOT_FOUND',
+              ),
+            ),
+          );
+        }
+      },
+    );
+
+    test(
+      'task selection remains explicit when numbers overlap across courses',
+      () async {
+        final service = _buildTwoCourseFanOutService(_courseDetailResponse);
+        await expectLater(
+          service.showTask(12, allowPrompt: false),
+          throwsA(
+            isA<CliException>().having(
+              (error) => error.code,
+              'code',
+              'AMBIGUOUS_INPUT',
+            ),
+          ),
+        );
+        await expectLater(
+          service.showTask(99, allowPrompt: false, courseSelector: 'CSE101'),
+          throwsA(
+            isA<CliException>().having(
+              (error) => error.code,
+              'code',
+              'TASK_NOT_FOUND',
+            ),
+          ),
+        );
+        await expectLater(
+          service.showNotice(9, allowPrompt: false, courseSelector: 'unknown'),
+          throwsA(
+            isA<CliException>().having(
+              (error) => error.code,
+              'code',
+              'COURSE_NOT_FOUND',
+            ),
+          ),
+        );
+      },
+    );
+  });
+  test(
+    'notice detail uses list-bound board context and attachment metadata',
+    () async {
+      final service = _buildTwoCourseFanOutService((request) async {
+        if (request.url.path.endsWith('/BoardStdList.do')) {
+          return _jsonResponse({
+            'list': [
+              {
+                'boardNo': 9,
+                'masterNo': 7,
+                'title': '목록 제목',
+                'userNm': '교수',
+                'registDt': '2026-03-10 12:00',
+                'atchFileId': 'report-files',
+                'fileCnt': 2,
+              },
+            ],
+          });
+        }
+        if (request.url.path.endsWith('/BoardStdView.do')) {
+          expect(jsonDecode(request.body)['searchMasterNo'], '7');
+          return _jsonResponse({
+            'board': {'boardNo': 9, 'contents': '<p>본문</p>'},
+          });
+        }
+        return _courseDetailResponse(request);
+      });
+      final result = await service.showNotice(
+        9,
+        allowPrompt: false,
+        courseSelector: 'CSE101',
+      );
+      expect(result.data.title, '목록 제목');
+      expect(result.data.contentText, '본문');
+      expect(result.data.authorName, '교수');
+      expect(result.data.attachments, hasLength(2));
+      expect(result.warnings, isEmpty);
+    },
+  );
+
+  test(
+    'notice detail can read a known number outside the loaded list',
+    () async {
+      final service = _buildTwoCourseFanOutService(
+        (request) async => request.url.path.endsWith('/BoardStdList.do')
+            ? _jsonResponse({'list': []})
+            : _courseDetailResponse(request),
+      );
+      final result = await service.showNotice(
+        9,
+        allowPrompt: false,
+        courseSelector: 'CSE101',
+      );
+      expect(result.data.contentText, contains('강의실'));
+      expect(result.data.attachments, hasLength(2));
+    },
+  );
+}
+
+Future<http.Response> _courseDetailResponse(http.Request request) async {
+  if (request.url.path.endsWith('/BoardViewStdPage.do')) {
+    return http.Response('<html>notice</html>', 200);
+  }
+  if (request.url.path.endsWith('/BoardStdView.do')) {
+    return _jsonResponse({
+      'data': {
+        'detail': {
+          'boardNo': 9,
+          'title': '시험 안내',
+          'userNm': '교수',
+          'registDt': '2026-03-10 12:00',
+          'fileCnt': 2,
+          'atchFileId': 'report-files',
+          'content': '<p>강의실 &amp; 준비물</p><p>두 번째 문단</p>',
+        },
+        'comments': [],
+      },
+    });
+  }
+  if (request.url.path.endsWith('/BoardStdList.do')) {
+    return _jsonResponse({
+      'list': [
+        {'boardNo': 9, 'masterNo': 7, 'title': '시험 안내'},
+      ],
+    });
+  }
+  if (request.url.path.endsWith('/TaskStdList.do')) {
+    final body = jsonDecode(request.body);
+    return _jsonAnyResponse(
+      body['currentPage'] == 0
+          ? [
+              {
+                'taskNo': 12,
+                'title': '알고리즘 과제',
+                'expiredate': '2026-03-20',
+                'submitYn': 'Y',
+              },
+            ]
+          : [],
+    );
+  }
+  if (request.url.path.endsWith('/TaskStdView.do')) {
+    return _jsonResponse({
+      'rpt': {
+        'title': '알고리즘 과제',
+        'contents': '<p>알고리즘을 작성하세요.</p>',
+        'atchFileId': 'report-files',
+      },
+      'smt': {'contents': '제출했습니다.', 'fileGroupId': 'submission-files'},
+    });
+  }
+  if (request.url.path.endsWith('/UploadFileList.do')) {
+    final body = jsonDecode(request.body);
+    if (body['attachId'] == 'submission-files') {
+      return _jsonAnyResponse([
+        {'fileSn': '1', 'fileName': '답안.zip', 'fileSize': 3},
+      ]);
+    }
+    return _jsonAnyResponse([
+      {'fileSn': '1', 'orignlFileNm': '안내.pdf', 'fileMg': 3},
+      {'fileSn': '2', 'orignlFileNm': '안내.pdf', 'fileMg': 3},
+    ]);
+  }
+  if (request.url.path.contains('/DownloadFile/')) {
+    expect(request.headers['cookie'], contains('detail_session=fixture'));
+    return http.Response.bytes(
+      [1, 2, 3],
+      200,
+      headers: {'content-type': 'application/octet-stream'},
+    );
+  }
+  return http.Response('Not Found', 404);
 }
 
 KlasflowService _buildTwoCourseFanOutService(
@@ -1078,7 +1610,14 @@ KlasflowService _buildTwoCourseFanOutService(
           case '/usr/cmn/login/LoginCaptcha.do':
             return http.Response('OK', 200);
           case '/usr/cmn/login/LoginConfirm.do':
-            return _jsonResponse({'success': true});
+            return http.Response(
+              jsonEncode({'success': true}),
+              200,
+              headers: {
+                'content-type': 'application/json; charset=utf-8',
+                'set-cookie': 'detail_session=fixture; Path=/; HttpOnly',
+              },
+            );
           case '/std/cmn/frame/KlasStop.do':
             return _utf8TextResponse(
               '<html><head><title>KLAS</title></head></html>',

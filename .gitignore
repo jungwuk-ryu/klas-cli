@@ -3,3 +3,6 @@
 .dart_tool/
 build/
 .sisyphus/
+
+# Private attachments saved by the README examples.
+/downloads/

@@ -90,3 +90,17 @@
 - Alternatives considered: stopping after installation; forcing environment-variable login only; adding an installer-only command inside the CLI.
 - Why this is better here: it satisfies the request to continue into login without changing the CLI command surface, and it handles the `curl ... | bash` stdin redirection case truthfully.
 - Remaining risk: interactive login still depends on a real terminal or pre-supplied `KLAS_ID` and `KLAS_PASSWORD`.
+
+## Course bodies and attachments
+
+- Chosen option: extend the current CLI with course-scoped `notices show` and body/attachment support in `tasks show`, using the hosted `klasflow` 1.2.0 public APIs. Add `--download-dir` to these detail commands. This supersedes the earlier notice-detail deferral for subsequent releases.
+- Alternatives considered: adding a standalone `files` index; exposing attachment identifiers for a second download command; automatically downloading all files on every detail read; requiring SDK changes or a local path dependency.
+- Why this is better here: the SDK already exposes course details, attachment lists, and authenticated downloads. Keeping attachments with their notice or task preserves course context and avoids inventing a user-wide file index. Text bodies make the existing detail workflow useful in a terminal while JSON preserves the HTML and distinguishes instructor from submission files.
+- Remaining risk: attachment availability depends on KLAS file metadata, and binary files still need a suitable viewer. Listing/download failures retain the body and report sanitized warnings; consumers must inspect warnings and local paths. An attachment reference that returns no files is explicitly warned about.
+
+## Download storage and compatibility
+
+- Chosen option: download only when an explicit destination is supplied, creating a unique child directory and numbered, sanitized filenames. Keep body/attachment fields additive under JSON schema version `1.0` and document null lists separately from empty lists.
+- Alternatives considered: overwriting matching filenames; prompting for every collision; adding base64 file contents to JSON; changing existing task fields or the envelope version.
+- Why this is better here: repeated commands preserve existing files, downloads remain usable by humans and agents, and JSON stdout stays clean. Dry-run validates inputs without network or filesystem writes, while `--fields` changes output alone.
+- Remaining risk: the SDK buffers each download in memory. Disk or network failures can leave partial downloads across a group; warnings identify unsuccessful files. No release or live account mutation is part of this implementation.

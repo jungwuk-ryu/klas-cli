@@ -507,6 +507,10 @@ final class TasksShowCommand extends KlasCommand<TaskView> {
       'course',
       help: 'Exact course id or exact course title.',
     );
+    argParser.addOption(
+      'download-dir',
+      help: 'Save task and submission attachments in a new subdirectory here.',
+    );
   }
 
   @override
@@ -514,7 +518,7 @@ final class TasksShowCommand extends KlasCommand<TaskView> {
 
   @override
   String get description =>
-      'Show one task by task number, optionally narrowed by course.';
+      'Show a task body and attachments, optionally narrowed by course.';
 
   @override
   String get invocation =>
@@ -535,13 +539,14 @@ final class TasksShowCommand extends KlasCommand<TaskView> {
       );
     }
     final taskNo = int.tryParse(argResults!.rest.single);
-    if (taskNo == null) {
+    if (taskNo == null || taskNo < 0) {
       throw const CliException(
         code: 'USAGE_ERROR',
-        message: 'Task number must be an integer.',
+        message: 'Task number must be a non-negative integer.',
         exitCode: ExitCodes.usage,
       );
     }
+    _validateDownloadDirectory(argResults!['download-dir'] as String?);
   }
 
   @override
@@ -552,6 +557,7 @@ final class TasksShowCommand extends KlasCommand<TaskView> {
       taskNo,
       allowPrompt: allowPrompt,
       courseSelector: argResults!['course'] as String?,
+      downloadDirectory: argResults!['download-dir'] as String?,
     );
   }
 
@@ -569,7 +575,10 @@ final class TasksShowCommand extends KlasCommand<TaskView> {
       'Due: ${value.dueAt ?? '-'}',
       'Submission status: ${value.submissionStatus.value}',
       'Report title: ${value.reportTitle ?? '-'}',
+      'Body:\n${value.reportText ?? '-'}',
+      _renderAttachments('Attachments', value.attachments),
       'Submission text: ${value.submissionText ?? '-'}',
+      _renderAttachments('Submission attachments', value.submissionAttachments),
     ].join('\n');
   }
 }
@@ -577,13 +586,15 @@ final class TasksShowCommand extends KlasCommand<TaskView> {
 final class NoticesGroupCommand extends Command<int> {
   NoticesGroupCommand(Terminal terminal, KlasService service) {
     addSubcommand(NoticesListCommand(terminal, service));
+    addSubcommand(NoticesShowCommand(terminal, service));
   }
 
   @override
   String get name => 'notices';
 
   @override
-  String get description => 'List course notices.';
+  String get description =>
+      'List course notices and read their bodies and attachments.';
 }
 
 final class NoticesListCommand extends KlasCommand<List<NoticeView>> {
@@ -630,10 +641,103 @@ final class NoticesListCommand extends KlasCommand<List<NoticeView>> {
     return value
         .map(
           (notice) =>
-              '[${notice.courseTitle}] #${notice.boardNo} ${notice.title ?? '-'} | posted=${notice.postedAt ?? '-'} | attachments=${notice.hasAttachments ? notice.fileCount : 0}',
+              '[${notice.courseTitle} | ${notice.courseId}] #${notice.boardNo} ${notice.title ?? '-'} | posted=${notice.postedAt ?? '-'} | attachments=${notice.hasAttachments ? notice.fileCount : 0}',
         )
         .join('\n');
   }
+}
+
+final class NoticesShowCommand extends KlasCommand<NoticeView> {
+  NoticesShowCommand(super.terminal, super.service) {
+    argParser.addOption(
+      'course',
+      help: 'Required exact course id or exact course title.',
+    );
+    argParser.addOption(
+      'download-dir',
+      help: 'Save attachments in a new subdirectory here.',
+    );
+  }
+
+  @override
+  String get name => 'show';
+
+  @override
+  String get description => 'Show a notice body and attachments in one course.';
+
+  @override
+  String get invocation =>
+      '${runner!.executableName} notices show <board_no> --course <course> [arguments]';
+
+  @override
+  void validateInputs() {
+    final selector = argResults!['course'] as String?;
+    if (selector == null) {
+      throw const CliException(
+        code: 'USAGE_ERROR',
+        message: 'Missing required option: --course',
+        exitCode: ExitCodes.usage,
+        hint: 'Example: klas notices show 12 --course CSE101',
+      );
+    }
+    validateCourseSelector(selector);
+    if (argResults!.rest.length != 1) {
+      throw const CliException(
+        code: 'USAGE_ERROR',
+        message: 'Provide exactly one notice number.',
+        exitCode: ExitCodes.usage,
+        hint:
+            'Use the board number from `klas notices list --course <course>`.',
+      );
+    }
+    final boardNo = int.tryParse(argResults!.rest.single);
+    if (boardNo == null || boardNo < 0) {
+      throw const CliException(
+        code: 'USAGE_ERROR',
+        message: 'Notice number must be a non-negative integer.',
+        exitCode: ExitCodes.usage,
+      );
+    }
+    _validateDownloadDirectory(argResults!['download-dir'] as String?);
+  }
+
+  @override
+  Future<CommandPayload<NoticeView>> load() => service.showNotice(
+    int.parse(argResults!.rest.single),
+    allowPrompt: allowPrompt,
+    courseSelector: argResults!['course'] as String,
+    downloadDirectory: argResults!['download-dir'] as String?,
+  );
+
+  @override
+  Object? toJson(NoticeView value) => value.toJson();
+
+  @override
+  String toText(NoticeView value) => [
+    'Course: ${value.courseTitle} [${value.courseId}]',
+    'Notice #: ${value.boardNo}',
+    'Title: ${value.title ?? '-'}',
+    'Author: ${value.authorName ?? '-'}',
+    'Posted: ${value.postedAt ?? '-'}',
+    'Body:\n${value.contentText ?? '-'}',
+    _renderAttachments('Attachments', value.attachments),
+  ].join('\n');
+}
+
+void _validateDownloadDirectory(String? directory) {
+  if (directory != null) {
+    validateNoControlChars(directory, fieldName: 'download directory');
+  }
+}
+
+String _renderAttachments(String label, List<AttachmentView>? files) {
+  if (files == null) return '$label: unavailable';
+  if (files.isEmpty) return '$label: none';
+  return [
+    '$label:',
+    for (var index = 0; index < files.length; index++)
+      '  ${index + 1}. ${files[index].fileName ?? '(unnamed)'} | bytes=${files[index].sizeBytes ?? '-'}${files[index].localPath == null ? '' : ' | saved=${files[index].localPath}'}',
+  ].join('\n');
 }
 
 final class TimetableGroupCommand extends Command<int> {

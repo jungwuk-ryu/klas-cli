@@ -9,7 +9,9 @@ import '../auth/session_metadata.dart';
 import '../auth/terminal.dart';
 import '../errors/cli_errors.dart';
 import '../models/cli_models.dart';
+import '../output/body_text.dart';
 import '../validation/input_validation.dart';
+import 'attachment_loader.dart';
 
 typedef KlasClientFactory = KlasClient Function();
 
@@ -43,11 +45,19 @@ abstract interface class KlasService {
     int taskNo, {
     required bool allowPrompt,
     String? courseSelector,
+    String? downloadDirectory,
   });
 
   Future<CommandPayload<List<NoticeView>>> listNotices({
     required bool allowPrompt,
     String? courseSelector,
+  });
+
+  Future<CommandPayload<NoticeView>> showNotice(
+    int boardNo, {
+    required bool allowPrompt,
+    required String courseSelector,
+    String? downloadDirectory,
   });
 
   Future<CommandPayload<List<ScheduleView>>> scheduleWeek({
@@ -328,7 +338,14 @@ final class KlasflowService implements KlasService {
     int taskNo, {
     required bool allowPrompt,
     String? courseSelector,
+    String? downloadDirectory,
   }) async {
+    if (downloadDirectory != null) {
+      validateNoControlChars(
+        downloadDirectory,
+        fieldName: 'download directory',
+      );
+    }
     return _withUser(
       allowPrompt: allowPrompt,
       action: (client, user, _) async {
@@ -372,6 +389,18 @@ final class KlasflowService implements KlasService {
 
         final selected = matches.first;
         final detail = await selected.$1.learning.getTaskDetail(ordseq: taskNo);
+        final loader = AttachmentLoader(
+          user,
+          downloadDirectory: downloadDirectory,
+        );
+        final attachments = await loader.load(
+          detail.reportAttachId,
+          'attachments',
+        );
+        final submissionAttachments = await loader.load(
+          detail.submissionAttachId,
+          'submission_attachments',
+        );
         return CommandPayload<TaskView>(
           data: TaskView(
             courseId: selected.$1.courseId,
@@ -384,8 +413,113 @@ final class KlasflowService implements KlasService {
             submissionStatus: _submissionStatus(selected.$2.submitted),
             reportTitle: detail.reportTitle,
             reportHtml: detail.reportHtml,
+            reportText: bodyText(detail.reportHtml),
             submissionText: detail.submissionText,
+            attachments: attachments,
+            submissionAttachments: submissionAttachments,
           ),
+          warnings: loader.warnings,
+        );
+      },
+    );
+  }
+
+  @override
+  Future<CommandPayload<NoticeView>> showNotice(
+    int boardNo, {
+    required bool allowPrompt,
+    required String courseSelector,
+    String? downloadDirectory,
+  }) async {
+    if (downloadDirectory != null) {
+      validateNoControlChars(
+        downloadDirectory,
+        fieldName: 'download directory',
+      );
+    }
+    return _withUser(
+      allowPrompt: allowPrompt,
+      action: (client, user, _) async {
+        final course = await _selectSingleCourse(user, courseSelector);
+        final notices = await _loadAllNotices(course);
+        KlasBoardPostSummary? summary;
+        for (final notice in notices) {
+          if (notice.boardNo == boardNo) {
+            summary = notice;
+            break;
+          }
+        }
+        final detail = summary == null
+            ? await course.noticeBoard.getPost(boardNo: boardNo)
+            : await summary.getPost();
+        final board = detail.board;
+        if (board == null ||
+            board.raw.isEmpty ||
+            (board.integer('boardNo') != null &&
+                board.integer('boardNo') != boardNo)) {
+          throw const CliException(
+            code: 'NOTICE_NOT_FOUND',
+            message: 'No notice matched the requested number in that course.',
+            exitCode: ExitCodes.notFound,
+            hint:
+                'Run `klas notices list --course <course>` and reuse its board number.',
+          );
+        }
+        final html = _recordString(board, const [
+          'content',
+          'contents',
+          'cn',
+          'bbsCn',
+          'boardCn',
+          'boardContents',
+          'boardContent',
+          'boardHtml',
+          'htmlData',
+          'editorData',
+          'body',
+          'text',
+          'html',
+        ]);
+        final attachId =
+            _recordString(board, const [
+              'atchFileId',
+              'attachId',
+              'fileGroupId',
+            ]) ??
+            summary?.attachId;
+        final loader = AttachmentLoader(
+          user,
+          downloadDirectory: downloadDirectory,
+        );
+        var attachments = await loader.load(attachId, 'attachments');
+        final fileCount =
+            board.integer('fileCnt') ??
+            summary?.fileCount ??
+            attachments?.length ??
+            0;
+        if (attachId == null && fileCount > 0) {
+          attachments = null;
+          loader.warnings.add(
+            'This notice reports attachments but did not return an attachment reference.',
+          );
+        }
+        return CommandPayload<NoticeView>(
+          data: NoticeView(
+            courseId: course.courseId,
+            courseTitle: course.title ?? course.courseId,
+            boardNo: boardNo,
+            title: board.string('title') ?? summary?.title,
+            authorName: board.string('userNm') ?? summary?.authorName,
+            postedAt: _normalizeDateTime(
+              board.string('registDt') ?? summary?.registeredAt,
+            ),
+            hasAttachments: attachId != null || fileCount > 0,
+            fileCount: fileCount,
+            contentHtml: html,
+            contentText: bodyText(html),
+            attachments: attachments,
+          ),
+          warnings: loader.warnings,
         );
       },
     );
@@ -889,6 +1023,14 @@ final class _ResolvedCredentials {
 }
 
 String _nowIso() => DateTime.now().toIso8601String();
+
+String? _recordString(KlasRecord record, List<String> keys) {
+  for (final key in keys) {
+    final value = record.string(key)?.trim();
+    if (value != null && value.isNotEmpty) return value;
+  }
+  return null;
+}
 
 String? _normalizeDate(String? value) {
   final normalized = _normalizeDateTime(value);

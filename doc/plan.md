@@ -1,5 +1,7 @@
 # Implementation Plan
 
+The original 1.0.0 scope below is historical. The current notice/task detail extension is specified in [course-details-plan.md](course-details-plan.md) and supersedes the notice-detail deferral below.
+
 ## Goal
 
 Build a production-ready Dart CLI on top of `klasflow` that is safe for human students and reliable for AI agents, with text output by default and a stable JSON envelope for automation.

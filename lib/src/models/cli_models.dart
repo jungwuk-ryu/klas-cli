@@ -180,7 +180,10 @@ class TaskView {
     this.dueAt,
     this.reportTitle,
     this.reportHtml,
+    this.reportText,
     this.submissionText,
+    this.attachments,
+    this.submissionAttachments,
   });
 
   final String courseId;
@@ -193,7 +196,10 @@ class TaskView {
   final String? dueAt;
   final String? reportTitle;
   final String? reportHtml;
+  final String? reportText;
   final String? submissionText;
+  final List<AttachmentView>? attachments;
+  final List<AttachmentView>? submissionAttachments;
 
   JsonMap toJson() => <String, Object?>{
     'course_id': courseId,
@@ -206,7 +212,12 @@ class TaskView {
     'submission_status': submissionStatus.value,
     'report_title': reportTitle,
     'report_html': reportHtml,
+    'report_text': reportText,
     'submission_text': submissionText,
+    'attachments': attachments?.map((file) => file.toJson()).toList(),
+    'submission_attachments': submissionAttachments
+        ?.map((file) => file.toJson())
+        .toList(),
   };
 }
 
@@ -220,6 +231,9 @@ class NoticeView {
     this.title,
     this.authorName,
     this.postedAt,
+    this.contentHtml,
+    this.contentText,
+    this.attachments,
   });
 
   final String courseId;
@@ -230,6 +244,9 @@ class NoticeView {
   final String? title;
   final String? authorName;
   final String? postedAt;
+  final String? contentHtml;
+  final String? contentText;
+  final List<AttachmentView>? attachments;
 
   JsonMap toJson() => <String, Object?>{
     'course_id': courseId,
@@ -240,6 +257,23 @@ class NoticeView {
     'posted_at': postedAt,
     'has_attachments': hasAttachments,
     'file_count': fileCount,
+    'content_html': contentHtml,
+    'content_text': contentText,
+    'attachments': attachments?.map((file) => file.toJson()).toList(),
+  };
+}
+
+class AttachmentView {
+  const AttachmentView({this.fileName, this.sizeBytes, this.localPath});
+
+  final String? fileName;
+  final int? sizeBytes;
+  final String? localPath;
+
+  JsonMap toJson() => <String, Object?>{
+    'file_name': fileName,
+    'size_bytes': sizeBytes,
+    'local_path': localPath,
   };
 }
 

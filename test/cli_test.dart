@@ -258,24 +258,24 @@ void main() {
     expect(payload['data']['subcommands'], <dynamic>['calendar month']);
   });
 
-  test(
-    'schema notices lists only the shipped notices list subcommand',
-    () async {
-      final terminal = FakeTerminal();
+  test('schema notices lists both shipped notices subcommands', () async {
+    final terminal = FakeTerminal();
 
-      final exitCode = await runKlasCli(
-        <String>['--format', 'json', 'schema', 'notices'],
-        terminal: terminal,
-        service: FakeKlasService(),
-      );
+    final exitCode = await runKlasCli(
+      <String>['--format', 'json', 'schema', 'notices'],
+      terminal: terminal,
+      service: FakeKlasService(),
+    );
 
-      expect(exitCode, ExitCodes.success);
-      final payload =
-          jsonDecode(terminal.outLines.single) as Map<String, dynamic>;
-      expect(payload['data']['path'], 'notices');
-      expect(payload['data']['subcommands'], <dynamic>['notices list']);
-    },
-  );
+    expect(exitCode, ExitCodes.success);
+    final payload =
+        jsonDecode(terminal.outLines.single) as Map<String, dynamic>;
+    expect(payload['data']['path'], 'notices');
+    expect(payload['data']['subcommands'], <dynamic>[
+      'notices list',
+      'notices show',
+    ]);
+  });
 
   test('schema schedule path is removed from the canonical surface', () async {
     final terminal = FakeTerminal();
@@ -313,11 +313,6 @@ void main() {
         arguments: <String>['tasks', 'overdue'],
         command: 'tasks overdue',
         token: 'overdue',
-      ),
-      (
-        arguments: <String>['notices', 'show'],
-        command: 'notices show',
-        token: 'show',
       ),
     ];
 
@@ -658,6 +653,25 @@ typedef ListTasksHandler =
       required bool allowPrompt,
       String? courseSelector,
     });
+typedef ShowTaskHandler =
+    Future<CommandPayload<TaskView>> Function(
+      int taskNo, {
+      required bool allowPrompt,
+      String? courseSelector,
+      String? downloadDirectory,
+    });
+typedef ShowNoticeHandler =
+    Future<CommandPayload<NoticeView>> Function(
+      int boardNo, {
+      required bool allowPrompt,
+      required String courseSelector,
+      String? downloadDirectory,
+    });
+typedef ListNoticesHandler =
+    Future<CommandPayload<List<NoticeView>>> Function({
+      required bool allowPrompt,
+      String? courseSelector,
+    });
 typedef ScheduleMonthHandler =
     Future<CommandPayload<List<ScheduleView>>> Function({
       required bool allowPrompt,
@@ -677,6 +691,9 @@ final class FakeKlasService implements KlasService {
     this.listCoursesHandler,
     this.showCourseHandler,
     this.listTasksHandler,
+    this.showTaskHandler,
+    this.showNoticeHandler,
+    this.listNoticesHandler,
     this.scheduleMonthHandler,
     this.scheduleWeekHandler,
   });
@@ -687,6 +704,9 @@ final class FakeKlasService implements KlasService {
   final ListCoursesHandler? listCoursesHandler;
   final ShowCourseHandler? showCourseHandler;
   final ListTasksHandler? listTasksHandler;
+  final ShowTaskHandler? showTaskHandler;
+  final ShowNoticeHandler? showNoticeHandler;
+  final ListNoticesHandler? listNoticesHandler;
   final ScheduleMonthHandler? scheduleMonthHandler;
   final ScheduleWeekHandler? scheduleWeekHandler;
 
@@ -764,8 +784,35 @@ final class FakeKlasService implements KlasService {
     required bool allowPrompt,
     String? courseSelector,
   }) async {
-    return const CommandPayload<List<NoticeView>>(data: <NoticeView>[]);
+    return listNoticesHandler?.call(
+          allowPrompt: allowPrompt,
+          courseSelector: courseSelector,
+        ) ??
+        const CommandPayload<List<NoticeView>>(data: <NoticeView>[]);
   }
+
+  @override
+  Future<CommandPayload<NoticeView>> showNotice(
+    int boardNo, {
+    required bool allowPrompt,
+    required String courseSelector,
+    String? downloadDirectory,
+  }) async =>
+      showNoticeHandler?.call(
+        boardNo,
+        allowPrompt: allowPrompt,
+        courseSelector: courseSelector,
+        downloadDirectory: downloadDirectory,
+      ) ??
+      CommandPayload<NoticeView>(
+        data: NoticeView(
+          courseId: courseSelector,
+          courseTitle: 'Data Structures',
+          boardNo: boardNo,
+          hasAttachments: false,
+          fileCount: 0,
+        ),
+      );
 
   @override
   Future<CommandPayload<List<ScheduleView>>> scheduleMonth({
@@ -809,14 +856,21 @@ final class FakeKlasService implements KlasService {
     int taskNo, {
     required bool allowPrompt,
     String? courseSelector,
+    String? downloadDirectory,
   }) async {
-    return CommandPayload<TaskView>(
-      data: TaskView(
-        courseId: courseSelector ?? 'CSE101',
-        courseTitle: 'Data Structures',
-        taskNo: taskNo,
-        submissionStatus: TaskSubmissionStatus.unknown,
-      ),
-    );
+    return showTaskHandler?.call(
+          taskNo,
+          allowPrompt: allowPrompt,
+          courseSelector: courseSelector,
+          downloadDirectory: downloadDirectory,
+        ) ??
+        CommandPayload<TaskView>(
+          data: TaskView(
+            courseId: courseSelector ?? 'CSE101',
+            courseTitle: 'Data Structures',
+            taskNo: taskNo,
+            submissionStatus: TaskSubmissionStatus.unknown,
+          ),
+        );
   }
 }

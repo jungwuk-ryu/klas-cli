@@ -38,20 +38,47 @@ klas courses show --course <course>
 klas tasks list [--course <course>]
 klas tasks show <task-no> [--course <course>]
 klas notices list [--course <course>]
+klas notices show <board-no> --course <course>
 klas timetable week
 klas calendar month [--year <year>] [--month <month>]
 klas schema [command ...]
 ```
 
-### 1.0.0에 포함되지 않는 명령어
+### 현재 보류된 명령어
 
-아래 명령어는 `1.0.0`에 포함되지 않습니다(비목표/보류).
+아래 명령어는 현재 제공하지 않습니다.
 
 - `klas tasks due`
 - `klas tasks overdue`
-- `klas notices show`
 - `klas progress ...`
 - `klas files ...`
+
+### 특정 강의의 공지·과제 본문과 첨부파일
+
+`courses list`에서 강의 ID를 확인하고, 목록에서 공지 번호(`board_no`)나 과제 번호(`task_no`)를 찾으세요. `--course`에는 정확한 강의 ID 또는 강의명을 사용할 수 있습니다.
+
+```bash
+klas courses list
+klas notices list --course CSE101
+klas notices show 7 --course CSE101
+klas tasks list --course CSE101
+klas tasks show 12 --course CSE101
+```
+
+상세 조회는 본문과 첨부파일 이름·크기를 표시합니다. 과제는 교수자가 올린 첨부와 본인이 제출한 첨부를 구분합니다. 공지 상세에는 `--course`가 필수이고, 과제 번호가 여러 강의에서 중복되면 `--course`로 강의를 지정해야 합니다.
+
+첨부파일을 열려면 `--download-dir`로 저장 경로를 지정하세요. 출력의 `saved=` 경로를 로컬 뷰어로 열 수 있습니다. 각 실행은 지정한 경로 아래 새 `klas-...` 폴더를 만들며, 파일명에 번호를 붙여 기존 파일과 이름이 같은 첨부도 덮어쓰지 않습니다. 실제 저장 경로는 JSON의 `local_path`에도 표시됩니다.
+
+```bash
+klas notices show 7 --course CSE101 --download-dir ./downloads
+klas tasks show 12 --course CSE101 --download-dir ./downloads
+klas --format json notices show 7 --course CSE101
+klas --format json --fields report_text,attachments,submission_attachments tasks show 12 --course CSE101
+```
+
+기본 상세 조회는 파일 목록만 가져옵니다. 파일 저장은 `--download-dir`가 있을 때 수행하며, `--dry-run`은 네트워크 호출이나 폴더 생성을 하지 않습니다. 파일이 없으면 첨부 목록은 빈 배열이고, 첨부 조회에 실패하면 `null`과 `warnings`가 반환됩니다. 일부 다운로드가 실패해도 본문과 나머지 첨부는 유지하며, 저장하지 못한 파일의 `local_path`는 `null`입니다. `--fields`는 출력만 줄이므로 다운로드 옵션의 동작에는 영향을 주지 않습니다.
+
+텍스트 출력은 HTML 본문의 문단·목록·링크·코드 블록을 읽기 쉽게 변환합니다. JSON에는 원본 HTML과 변환된 텍스트를 함께 제공합니다. 첨부파일 내용은 저장 후 파일에 맞는 뷰어로 확인하세요.
 
 ## 로그인 방법
 
