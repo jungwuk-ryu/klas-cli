@@ -7,6 +7,7 @@ import 'package:klasflow/klasflow.dart';
 import '../auth/session_manager.dart';
 import '../auth/session_metadata.dart';
 import '../auth/terminal.dart';
+import '../auth/captcha_prompter.dart';
 import '../errors/cli_errors.dart';
 import '../models/cli_models.dart';
 import '../output/body_text.dart';
@@ -77,15 +78,19 @@ final class KlasflowService implements KlasService {
     required AuthSessionManager sessionManager,
     Map<String, String>? environment,
     KlasClientFactory? clientFactory,
+    CaptchaPrompter? captchaPrompter,
   }) : _terminal = terminal,
        _sessionManager = sessionManager,
        _environment = environment ?? Platform.environment,
-       _clientFactory = clientFactory ?? KlasClient.new;
+       _clientFactory = clientFactory ?? KlasClient.new,
+       _captchaPrompter =
+           captchaPrompter ?? CaptchaPrompter(terminal: terminal);
 
   final Terminal _terminal;
   final AuthSessionManager _sessionManager;
   final Map<String, String> _environment;
   final KlasClientFactory _clientFactory;
+  final CaptchaPrompter _captchaPrompter;
 
   @override
   Future<CommandPayload<AuthLoginView>> login({
@@ -102,7 +107,7 @@ final class KlasflowService implements KlasService {
         SessionCredentials(id: credentials.id, password: credentials.password),
       );
       return source;
-    });
+    }, allowPrompt: allowPrompt);
 
     return CommandPayload<AuthLoginView>(
       data: AuthLoginView(
@@ -658,7 +663,11 @@ final class KlasflowService implements KlasService {
   }) async {
     final credentials = await _resolveCredentials(allowPrompt: allowPrompt);
     try {
-      return await _withCredentials(credentials, action);
+      return await _withCredentials(
+        credentials,
+        action,
+        allowPrompt: allowPrompt,
+      );
     } on Object catch (error) {
       if (!_isCredentialFailure(error) ||
           credentials.source != CredentialSource.session) {
@@ -669,7 +678,11 @@ final class KlasflowService implements KlasService {
         allowPrompt: allowPrompt,
         useSession: false,
       );
-      return _withCredentials(fallbackCredentials, action);
+      return _withCredentials(
+        fallbackCredentials,
+        action,
+        allowPrompt: allowPrompt,
+      );
     }
   }
 
@@ -680,11 +693,18 @@ final class KlasflowService implements KlasService {
       KlasUser user,
       CredentialSource source,
     )
-    action,
-  ) async {
+    action, {
+    bool allowPrompt = false,
+  }) async {
     final client = _clientFactory();
     try {
-      final user = await client.login(credentials.id, credentials.password);
+      final user = await client.login(
+        credentials.id,
+        credentials.password,
+        onCaptcha: allowPrompt && _terminal.canPrompt
+            ? _captchaPrompter.answer
+            : null,
+      );
       return await action(client, user, credentials.source);
     } finally {
       client.close();

@@ -2,10 +2,10 @@
 
 ## Dependency strategy for `klasflow`
 
-- Chosen option: hosted pub.dev dependency on `klasflow`.
+- Chosen option: hosted pub.dev dependency on `klasflow` for published releases, with a Git override pinned to a verified SDK commit for development before that release is available.
 - Alternatives considered: local `path` dependency; git pinning to the upstream repository; vendoring/copying upstream code.
 - Why this is better here: the package is now published on pub.dev, so hosted versioning gives this standalone CLI a simpler install path and aligns dependency resolution with semantic versions instead of repository commits.
-- Remaining risk: upstream public releases can still change behavior across versions, so CLI verification should stay pinned to the published version range and be revalidated when bumping major or minor versions.
+- Remaining risk: Git override validation does not verify the future hosted package. Remove the override and revalidate the published version range before releasing the CLI.
 
 ## External CLI contract boundary
 
@@ -104,3 +104,17 @@
 - Alternatives considered: overwriting matching filenames; prompting for every collision; adding base64 file contents to JSON; changing existing task fields or the envelope version.
 - Why this is better here: repeated commands preserve existing files, downloads remain usable by humans and agents, and JSON stdout stays clean. Dry-run validates inputs without network or filesystem writes, while `--fields` changes output alone.
 - Remaining risk: the SDK buffers each download in memory. Disk or network failures can leave partial downloads across a group; warnings identify unsuccessful files. No release or live account mutation is part of this implementation.
+
+## Numeric captcha login continuation
+
+- Chosen option: extend the SDK's high-level login API with a human-input callback and let CLI services supply a temporary-image prompter for interactive text commands. The SDK keeps the same cookie jar, obtains fresh login security for retries, and limits captcha answers to three by default. The CLI removes each image after input and preserves stored auth for captcha errors.
+- Alternatives considered: split login and answer commands with persisted challenge state; Chrome-only login; automatic image recognition; treating every captcha as invalid credentials.
+- Why this is better here: the callback preserves the current server challenge without storing cookies or credentials between commands. Human input fits the existing terminal flow. JSON and stdin JSON remain deterministic and return the distinct `AUTH_CAPTCHA_REQUIRED` error so automation can request human action.
+- Remaining risk: image viewer availability varies, so the CLI prints a manual-open path to stderr. Hard interruption may leave a temporary image. Challenge logic is covered with mock HTTP, while real account captcha was not deliberately triggered. This depends on the new SDK 1.3.0; source checkouts use the verified Git pin below. Publish the SDK and restore a hosted lockfile before releasing the CLI.
+
+## SDK pin for reproducible source checkouts
+
+- Chosen option: keep the hosted `klasflow: ^1.3.0` publication requirement and commit a root `dependency_overrides` Git entry at SDK revision `7b1dadf4e0b9bdf75ccf3badaa52bf31a883ef22`.
+- Alternatives considered: a machine-specific path; an unpinned Git branch; publishing the SDK as part of a repository push; using a normal Git dependency that cannot pass pub.dev packaging validation.
+- Why this is better here: the verified SDK commit is available from the pushed repository, so another checkout and CI can resolve it without the developer's local files. A fixed revision prevents unrelated upstream branch movement from changing the tested code.
+- Remaining risk: this is development validation. SDK 1.3.0 must be published first, the override removed, and the hosted lockfile and full gate regenerated before the CLI is published.

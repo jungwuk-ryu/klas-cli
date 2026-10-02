@@ -192,12 +192,12 @@ final class AuthLoginCommand extends KlasCommand<AuthLoginView> {
 
   @override
   String get description =>
-      'Authenticate with KLAS and create durable local reusable auth.';
+      'Authenticate with KLAS, handle numeric captcha in interactive text mode, and save reusable auth.';
 
   @override
   Future<CommandPayload<AuthLoginView>> load() {
     return service.login(
-      allowPrompt: true,
+      allowPrompt: allowPrompt && !(argResults!['stdin-json'] as bool),
       useStdinJson: argResults!['stdin-json'] as bool,
     );
   }

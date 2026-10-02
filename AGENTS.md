@@ -92,6 +92,7 @@ Errors must be structured and machine-actionable.
 Use stable string codes such as:
 
 - `AUTH_REQUIRED`
+- `AUTH_CAPTCHA_REQUIRED`
 - `AUTH_INVALID_CREDENTIALS`
 - `AUTH_EXPIRED`
 - `NETWORK_ERROR`

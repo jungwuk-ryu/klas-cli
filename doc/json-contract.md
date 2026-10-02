@@ -94,6 +94,7 @@ Private downloaded attachments should stay outside version control. No file iden
 ## Stable error codes in v1
 
 - `AUTH_REQUIRED`
+- `AUTH_CAPTCHA_REQUIRED`
 - `AUTH_INVALID_CREDENTIALS`
 - `AUTH_EXPIRED`
 - `NETWORK_ERROR`
@@ -117,6 +118,8 @@ Private downloaded attachments should stay outside version control. No file iden
 - The CLI may create a reusable local auth session for later invocations.
 - Sensitive credentials are never included in the documented JSON envelope.
 - Durable local auth may be stored through an OS credential store or an encrypted local file, while runtime session metadata remains local CLI state.
+- `AUTH_CAPTCHA_REQUIRED` uses exit code `65` and `retryable=false`: a human must enter the current image's digits. Run `klas auth login` in an interactive terminal with text output, then retry the original command. Saved credentials are retained for captcha requests, cancellation, and retry exhaustion.
+- JSON commands and `auth login --stdin-json` never prompt for credentials or captcha. They do not download or expose a challenge image. `auth status` also remains silent. Interactive text commands may open a temporary image and request the human's numeric answer, with a default three-answer limit and blank input to cancel.
 
 ## Privacy rules
 

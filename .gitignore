@@ -6,3 +6,6 @@ build/
 
 # Private attachments saved by the README examples.
 /downloads/
+
+# Local SDK co-development configuration.
+/pubspec_overrides.yaml

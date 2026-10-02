@@ -84,6 +84,14 @@ klas --format json --fields report_text,attachments,submission_attachments tasks
 
 가장 쉬운 방법으로는 `auth login` 명령을 이용하시면 됩니다.
 
+```bash
+klas auth login
+```
+
+숫자 캡챠가 필요한 경우 임시 이미지를 기본 이미지 뷰어로 열고 터미널에서 숫자 입력을 받습니다. 이미지를 자동으로 열지 못하면 `stderr`에 표시된 경로를 직접 여세요. 앞자리 0을 포함해 입력하면 같은 로그인 세션으로 이어갑니다. 서버가 답을 거절하면 새 이미지를 받아 최대 3회까지 입력할 수 있고, 빈 입력으로 취소할 수 있습니다. 입력 후 임시 이미지는 삭제합니다. 캡챠 취소나 한도 초과는 저장된 인증 정보를 지우지 않습니다.
+
+일반 명령도 대화형 터미널의 텍스트 모드에서는 필요한 캡챠 입력을 받을 수 있습니다. `auth status`, `--format json`, `auth login --stdin-json`, 입력을 받을 수 없는 터미널은 캡챠를 요청하지 않고 `AUTH_CAPTCHA_REQUIRED`(종료 코드 65)를 반환합니다. 이때 대화형 터미널에서 `klas auth login`을 실행해 숫자를 입력한 뒤 원래 명령을 다시 실행하세요.
+
 환경변수를 쓰려면 아래처럼 설정하면 됩니다.
 
 ```bash
@@ -200,6 +208,8 @@ klas --format json --dry-run tasks show 12 --course CSE101
 - `70`: 내부 CLI 오류
 
 ## 확인용 명령어
+
+현재 개발 버전은 `pubspec.yaml`의 Git override로 검증한 `klasflow` 1.3.0 커밋을 고정합니다. 저장소를 checkout한 뒤 `dart pub get`을 실행하면 SDK를 자동으로 가져오며, 별도의 로컬 SDK 경로 설정은 필요하지 않습니다. `pubspec.lock`에도 같은 Git 커밋을 기록합니다. pub.dev 배포 전에는 SDK 1.3.0을 먼저 게시하고 override를 제거한 뒤 hosted 의존성으로 다시 검증합니다.
 
 ```bash
 dart run tool/check_all.dart

@@ -40,18 +40,18 @@ void main() {
     expect(error.hint, isNot(contains('session refresh failed')));
   });
 
-  test('maps captcha challenges to stable auth required error', () {
+  test('maps captcha challenges to a distinct actionable auth error', () {
     final error = ErrorMapper().map(
       const CaptchaRequiredException('captcha image token=captcha-raw-token'),
     );
 
-    expect(error.code, 'AUTH_REQUIRED');
+    expect(error.code, 'AUTH_CAPTCHA_REQUIRED');
     expect(error.exitCode, ExitCodes.auth);
     expect(
       error.message,
       'Interactive login is required because KLAS requested a captcha challenge.',
     );
-    expect(error.hint, 'Run `klas auth login` in a terminal session.');
+    expect(error.hint, contains('interactive terminal with text output'));
     expect(error.message, isNot(contains('captcha-raw-token')));
     expect(error.message, isNot(contains('captcha image token')));
     expect(error.hint, isNot(contains('captcha-raw-token')));
