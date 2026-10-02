@@ -1,5 +1,16 @@
 # Decision Log
 
+## Windows PowerShell 5.1 installer compatibility
+
+- Chosen option: use Windows native architecture environment variables and the
+  existing Dart 3.11.1 bootstrap, then prioritize the selected SDK on PATH.
+- Alternatives considered: requiring PowerShell 7 or trusting the first Dart
+  found on PATH.
+- Why this is better here: the documented Windows one-liner also runs in the
+  built-in PowerShell 5.1, and Flutter may put an older Dart before the CLI SDK.
+- Remaining risk: downloading the SDK and activating the package still depend
+  on network access; activation/help failures stop the installer with guidance.
+
 ## Dependency strategy for `klasflow`
 
 - Chosen option: hosted pub.dev dependency on `klasflow` for published releases, with a Git override pinned to a verified SDK commit for development before that release is available.
