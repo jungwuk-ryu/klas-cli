@@ -961,7 +961,7 @@ void main() {
   );
 
   test(
-    'monthly schedule table rows map into normalized schedule views',
+    'monthly calendar keeps full periods and rejects overflowing legacy days',
     () async {
       final service = KlasflowService(
         terminal: _SilentTerminal(),
@@ -1012,17 +1012,44 @@ void main() {
                 return _utf8TextResponse('<html><body>ok</body></html>', 200);
               case '/std/ads/admst/MySchdulMonthTableList.do':
                 final body = jsonDecode(request.body) as Map<String, dynamic>;
-                expect(body['schdulYear'], 2026);
-                expect(body['schdulMonth'], 4);
+                final year = body['schdulYear'] as int;
+                final month = body['schdulMonth'] as int;
+                expect(
+                  body['start'],
+                  DateTime(year, month).toIso8601String().substring(0, 10),
+                );
+                expect(
+                  body['end'],
+                  DateTime(year, month + 1).toIso8601String().substring(0, 10),
+                );
                 return http.Response(
-                  jsonEncode([
-                    {
-                      'started': '2026-04-20',
-                      'dayname': '1',
-                      'schdulTitle': '중간고사',
-                      'typeNm': '학사일정',
-                    },
-                  ]),
+                  jsonEncode(
+                    month == 2
+                        ? [
+                            {'dayNo': '29', 'title': '날짜만 있는 행사'},
+                          ]
+                        : [
+                            {
+                              'started': '202609252000',
+                              'ended': '202610061459',
+                              'title': '[과제] 연습 과제',
+                              'typeNm': '과제',
+                            },
+                            {
+                              'started': '202610200000',
+                              'ended': '202611020000',
+                              'title': '[학사일정] 학사 행사',
+                              'typeNm': '학사일정',
+                            },
+                            {
+                              'started': '2026-10-20',
+                              'ended': '2026-10-26',
+                              'dayname': '2',
+                              'schdulTitle': '[학사일정] 시험 기간',
+                              'typeNm': '학사일정',
+                            },
+                          ],
+                  ),
                   200,
                   headers: {'content-type': 'application/json; charset=utf-8'},
                 );
@@ -1036,18 +1063,41 @@ void main() {
       final payload = await service.scheduleMonth(
         allowPrompt: false,
         year: 2026,
-        month: 4,
+        month: 10,
       );
 
       expect(payload.meta['basis'], 'monthly_schedule_table');
       expect(payload.meta['year'], 2026);
-      expect(payload.meta['month'], 4);
-      expect(payload.data, hasLength(1));
+      expect(payload.meta['month'], 10);
+      expect(payload.data, hasLength(3));
       expect(payload.data.first.source, 'monthly_schedule_table');
-      expect(payload.data.first.dayOfWeek, '월');
-      expect(payload.data.first.title, '중간고사');
-      expect(payload.data.first.startsAt, '2026-04-20T00:00:00.000');
-      expect(payload.data.first.status, '학사일정');
+      expect(payload.data.first.dayOfWeek, '금');
+      expect(payload.data.first.title, '[과제] 연습 과제');
+      expect(payload.data.first.startsAt, '2026-09-25T20:00:00.000');
+      expect(payload.data.first.endsAt, '2026-10-06T14:59:00.000');
+      expect(payload.data.first.status, '과제');
+      final event = payload.data.singleWhere(
+        (item) => item.title.contains('학사 행사'),
+      );
+      expect(event.endsAt, '2026-11-02T00:00:00.000');
+      final exam = payload.data.singleWhere(
+        (item) => item.title.contains('시험 기간'),
+      );
+      expect(exam.startsAt, '2026-10-20T00:00:00.000');
+      expect(exam.endsAt, '2026-10-26T00:00:00.000');
+      final leap = await service.scheduleMonth(
+        allowPrompt: false,
+        year: 2028,
+        month: 2,
+      );
+      expect(leap.data.single.startsAt, '2028-02-29T00:00:00.000');
+      expect(leap.data.single.endsAt, isNull);
+      final invalid = await service.scheduleMonth(
+        allowPrompt: false,
+        year: 2026,
+        month: 2,
+      );
+      expect(invalid.data.single.startsAt, isNull);
     },
   );
   group('course bodies and attachments', () {

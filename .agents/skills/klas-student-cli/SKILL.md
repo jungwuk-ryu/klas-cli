@@ -148,7 +148,7 @@ klas --format json --dry-run tasks show 12 --course "CSE101"
 ```bash
 klas --format json timetable week
 klas --format json calendar month
-klas --format json calendar month --year 2026 --month 3
+klas --format json --fields title,starts_at,ends_at,status calendar month --year 2026 --month 10
 ```
 
 ## Interpretation rules
@@ -157,7 +157,8 @@ klas --format json calendar month --year 2026 --month 3
 - Reuse `course_id` from `tasks list` when a follow-up `tasks show` call needs `--course`.
 - Reuse `course_id` and `board_no` from `notices list` for `notices show`; `--course` is required for notice detail.
 - `timetable week` is timetable-based recurring class data.
-- `calendar month` is the direct monthly schedule table view.
+- Use `calendar month` for monthly assignments and academic schedules. It includes events overlapping the selected month and preserves the full period in `starts_at` and `ends_at`, even across month boundaries.
+- Use those full timestamps when reporting a period. Unknown dates are null, and date-only values use midnight; do not invent an end time or replace an event's original month with the requested month.
 - there is no mixed `today` command in the canonical surface.
 - `warnings` in the JSON envelope matter. They can indicate partial failures during course fan-out.
 - `schema` is the preferred way to discover supported flags and normalized output fields at runtime.

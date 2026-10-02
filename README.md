@@ -196,7 +196,14 @@ klas --format json --dry-run tasks show 12 --course CSE101
 ## 시간표와 일정 명령어
 
 - `timetable week`: 반복 수업 시간표 기준
-- `calendar month`: 월간 일정 테이블 항목을 월 기준으로 조회
+- `calendar month`: 선택한 월에 걸쳐 있는 과제와 학사일정 조회
+
+```bash
+klas calendar month --year 2026 --month 10
+klas --format json --fields title,starts_at,ends_at,status calendar month --year 2026 --month 10
+```
+
+각 일정의 `starts_at`과 `ends_at`은 원래 시작·종료 날짜와 시간을 유지합니다. 10월 일정에 포함된 과제가 9월에 시작하거나 학사일정이 11월에 끝나도 전체 기간을 확인할 수 있습니다. 텍스트 출력에도 시작과 종료가 함께 표시됩니다. 날짜를 알 수 없는 값은 JSON에서 `null`이며, 시간 없이 날짜만 제공된 값은 자정으로 표시됩니다.
 
 `tasks list`, `notices list`처럼 여러 과목을 한 번에 훑는 명령은 일부 과목 조회에 실패해도 전체를 중단하지 않고 `warnings`와 함께 부분 결과를 돌려줄 수 있습니다.
 

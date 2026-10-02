@@ -1,5 +1,20 @@
 # Decision Log
 
+## Full monthly calendar periods
+
+- Chosen option: use the SDK's typed monthly calendar timestamps and preserve
+  them in the existing `starts_at` and `ends_at` fields. Show both in text output.
+- Alternatives considered: rebuilding dates from the requested month and day;
+  deriving the calendar from recurring class times; parsing raw KLAS records in
+  the CLI.
+- Why this is better here: an event can start before the requested month or end
+  after it. The SDK owns request and date parsing behavior, while the CLI keeps
+  its stable output contract. Invalid legacy days remain unknown instead of
+  rolling into another month.
+- Remaining risk: missing dates and date-only values limit time precision.
+  Null and midnight semantics are documented. Read-only October verification
+  matched all ten events in the authenticated KLAS monthly calendar.
+
 ## Windows reusable auth session
 
 - Chosen option: subscribe to SIGTERM only on Unix; Windows uses the existing
@@ -137,7 +152,7 @@
 
 ## SDK pin for reproducible source checkouts
 
-- Chosen option: keep the hosted `klasflow: ^1.3.0` publication requirement and commit a root `dependency_overrides` Git entry at SDK revision `7b1dadf4e0b9bdf75ccf3badaa52bf31a883ef22`.
+- Chosen option: keep the hosted `klasflow: ^1.3.0` publication requirement and commit a root `dependency_overrides` Git entry at SDK revision `9ababd093d15c486c7ba2f1354e77bbfc6c74702`, including the monthly calendar correction.
 - Alternatives considered: a machine-specific path; an unpinned Git branch; publishing the SDK as part of a repository push; using a normal Git dependency that cannot pass pub.dev packaging validation.
 - Why this is better here: the verified SDK commit is available from the pushed repository, so another checkout and CI can resolve it without the developer's local files. A fixed revision prevents unrelated upstream branch movement from changing the tested code.
 - Remaining risk: this is development validation. SDK 1.3.0 must be published first, the override removed, and the hosted lockfile and full gate regenerated before the CLI is published.

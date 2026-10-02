@@ -1,5 +1,9 @@
 ## 1.1.0 (Unreleased)
 
+- Fix monthly calendar queries and preserve complete start/end dates and times across month boundaries in JSON and text output. Reject overflowing legacy day values.
+- Support the Windows installer in PowerShell 5.1 and prioritize the required Dart SDK on PATH.
+- Fix reusable auth session startup on Windows and allow enough time for cold Dart source startup.
+
 - Continue interactive text logins through numeric captcha using the `klasflow` 1.3.0 challenge callback. Open temporary images, preserve leading zeros, refresh rejected answers up to three times, and clean up images after input.
 - Add `AUTH_CAPTCHA_REQUIRED` for captcha requests, cancellation, or retry exhaustion. JSON/stdin JSON and noninteractive commands remain prompt-free, and captcha errors preserve stored auth.
 

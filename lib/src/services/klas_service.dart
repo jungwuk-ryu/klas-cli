@@ -1186,7 +1186,10 @@ ScheduleView _mapMonthlyScheduleTableItem(
     source: 'monthly_schedule_table',
     title: item.displayTitle,
     dayOfWeek: item.weekday,
-    startsAt: _dateOnMonth(item.dayOfMonth, year: year, month: month),
+    startsAt:
+        item.startsAt ??
+        _dateOnMonth(item.dayOfMonth, year: year, month: month),
+    endsAt: item.endsAt,
     status: item.status,
   );
 }
@@ -1205,7 +1208,7 @@ String? _dateOnMonth(String? value, {required int year, required int month}) {
     return null;
   }
   final day = int.tryParse(trimmed);
-  if (day == null) {
+  if (day == null || day < 1 || day > DateTime(year, month + 1, 0).day) {
     return null;
   }
   return DateTime(year, month, day).toIso8601String();

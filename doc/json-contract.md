@@ -91,6 +91,23 @@ Each attachment is normalized as:
 
 Private downloaded attachments should stay outside version control. No file identifiers, raw upstream records, or session material are exposed in attachment objects.
 
+## Monthly calendar payloads
+
+`calendar month [--year <year>] [--month <month>]` returns calendar events
+overlapping the selected month, including assignments and academic schedules.
+`meta.year` and `meta.month` identify the selected month; `meta.count` is the
+number of returned events.
+
+- `starts_at` and `ends_at` are ISO 8601 timestamps for the original full period.
+  Preserve September starts and November ends when querying October; do not
+  rebuild a date using the selected month and a day number.
+- Missing or invalid dates remain `null`. Legacy records containing only a valid
+  day number use the selected month for `starts_at`; `ends_at` remains unknown.
+- Date-only values use midnight. Do not assume that an academic event ends at
+  23:59 when KLAS supplies only its date.
+- The existing `ScheduleView` fields and JSON schema version `1.0` remain stable.
+  `timetable week` continues to return recurring class times.
+
 ## Stable error codes in v1
 
 - `AUTH_REQUIRED`
