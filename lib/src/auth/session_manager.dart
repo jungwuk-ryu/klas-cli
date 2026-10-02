@@ -138,7 +138,12 @@ final class LocalAuthSessionManager implements AuthSessionManager {
 
     final ready = await _waitForMetadata();
     if (ready == null) {
-      final error = await utf8.decodeStream(process.stderr);
+      process.kill();
+      final error = await utf8.decodeStream(process.stderr).timeout(
+        const Duration(seconds: 2),
+        onTimeout: () => 'Timed out waiting for the auth session daemon.',
+      );
+      await _cleanupStaleSession();
       throw CliException(
         code: 'INTERNAL_ERROR',
         message: 'Failed to start reusable auth session.',
@@ -179,7 +184,8 @@ final class LocalAuthSessionManager implements AuthSessionManager {
   }
 
   Future<AuthSessionMetadata?> _waitForMetadata() async {
-    for (var attempt = 0; attempt < 50; attempt++) {
+    // A source invocation may need to compile its child process on first use.
+    for (var attempt = 0; attempt < 200; attempt++) {
       final metadata = await _readMetadata();
       if (metadata != null) {
         try {
@@ -409,13 +415,15 @@ Future<int> runAuthSessionDaemon({required String metadataFilePath}) async {
   await tempFile.rename(metadataFile.path);
   await _setOwnerOnlyPermissions(metadataFile.path, '600');
 
-  ProcessSignal.sigterm.watch().listen((_) async {
-    await server.close(force: true);
-    if (await metadataFile.exists()) {
-      await metadataFile.delete();
-    }
-    exit(0);
-  });
+  if (!Platform.isWindows) {
+    ProcessSignal.sigterm.watch().listen((_) async {
+      await server.close(force: true);
+      if (await metadataFile.exists()) {
+        await metadataFile.delete();
+      }
+      exit(0);
+    });
+  }
 
   await for (final request in server) {
     if (request.headers.value(HttpHeaders.authorizationHeader) !=
