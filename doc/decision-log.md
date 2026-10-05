@@ -163,3 +163,10 @@
 - Alternatives considered: a machine-specific path; an unpinned Git branch; publishing the SDK as part of a repository push; using a normal Git dependency that cannot pass pub.dev packaging validation.
 - Why this is better here: the verified SDK commit is available from the pushed repository, so another checkout and CI can resolve it without the developer's local files. A fixed revision prevents unrelated upstream branch movement from changing the tested code.
 - Remaining risk: this is development validation. SDK 1.3.0 must be published first, the override removed, and the hosted lockfile and full gate regenerated before the CLI is published.
+
+## Recent branch integration
+
+- Chosen option: merge the five recent work branches into `develop` in dependency order with separate merge commits, then validate before pushing and cleaning up merged branches.
+- Alternatives considered: replacing `develop` with the latest work branch; keeping already integrated work branches indefinitely.
+- Why this is better here: it preserves both the existing develop workflow and each feature's implementation and history. The current verified SDK pin is retained because changing dependencies is a separate compatibility decision.
+- Remaining risk: the dependency override still requires hosted-release preparation. Remote work branches must be deleted only after their captured tips are confirmed in `develop` and its CI passes.
