@@ -1,5 +1,17 @@
 # Decision Log
 
+## Windows reusable auth session
+
+- Chosen option: subscribe to SIGTERM only on Unix; Windows uses the existing
+  authenticated loopback logout endpoint for normal shutdown.
+- Alternatives considered: swallowing arbitrary daemon startup errors or
+  turning off durable auth on Windows.
+- Why this is better here: Dart cannot watch SIGTERM on Windows, while local
+  status/credential/logout requests already work across platforms.
+- Remaining risk: abrupt process termination can leave stale metadata; existing
+  session readiness checks remove it. A real daemon lifecycle test covers startup,
+  authorization, logout, and cleanup without contacting KLAS.
+
 ## Windows PowerShell 5.1 installer compatibility
 
 - Chosen option: use Windows native architecture environment variables and the
