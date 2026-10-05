@@ -15,6 +15,10 @@ curl -fsSL https://raw.githubusercontent.com/jungwuk-ryu/klas-cli/main/install.s
 
 Windows PowerShell:
 
+기본 Windows PowerShell 5.1과 PowerShell 7을 지원합니다. Dart 3.11.1 이상이
+필요하며, 설치 스크립트는 기존 Dart가 더 오래됐으면 전용 SDK를 설치하고
+PATH에서 먼저 사용하도록 설정합니다.
+
 ```powershell
 iwr -useb https://raw.githubusercontent.com/jungwuk-ryu/klas-cli/main/install.ps1 | iex
 ```

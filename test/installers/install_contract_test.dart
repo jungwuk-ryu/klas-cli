@@ -46,9 +46,11 @@ void main() {
         expect(
           script,
           contains(
-            '[System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)',
+            '[Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT',
           ),
         );
+        expect(script, contains('Resolve-DartArchitecture'));
+        expect(script, contains(r"$DartVersion = '3.11.1'"));
         expect(script, contains('auth login'));
         expect(script, contains('klas.bat'));
       },

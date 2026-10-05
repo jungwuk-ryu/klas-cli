@@ -40,6 +40,19 @@ function Parse-DartVersion {
     return [Version]$match.Groups[1].Value
 }
 
+function Resolve-DartArchitecture {
+    # Windows PowerShell 5.1 does not always expose RuntimeInformation.OSArchitecture.
+    $architecture = $env:PROCESSOR_ARCHITEW6432
+    if ([string]::IsNullOrWhiteSpace($architecture)) {
+        $architecture = $env:PROCESSOR_ARCHITECTURE
+    }
+    switch ($architecture) {
+        'AMD64' { return 'x64' }
+        'ARM64' { return 'arm64' }
+        default { throw "Unsupported CPU architecture: $architecture" }
+    }
+}
+
 function Resolve-DartExe {
     $dartSource = Get-CommandPath 'dart'
     if ($null -eq $dartSource) {
@@ -74,11 +87,9 @@ function Add-PathEntry {
     $current = [Environment]::GetEnvironmentVariable('Path', $Target)
     $parts = @()
     if (-not [string]::IsNullOrWhiteSpace($current)) {
-        $parts = $current -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-    }
-
-    if ($parts -contains $PathValue) {
-        return
+        $parts = @($current -split ';' | Where-Object {
+            -not [string]::IsNullOrWhiteSpace($_) -and $_ -ine $PathValue
+        })
     }
 
     $updated = if ($parts.Count -eq 0) {
@@ -157,18 +168,13 @@ function Start-Login {
     Write-WarningLog 'Next step: klas auth login'
 }
 
-if (-not [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) {
+if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
     Fail 'This installer is only supported on Windows. Use install.sh on macOS or Linux.'
 }
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
-switch ($architecture) {
-    'X64' { $dartArch = 'x64' }
-    'Arm64' { $dartArch = 'arm64' }
-    default { Fail "Unsupported CPU architecture: $architecture" }
-}
+$dartArch = Resolve-DartArchitecture
 
 $installRoot = Join-Path $env:LOCALAPPDATA 'klas-cli'
 $dartBin = Join-Path $installRoot 'dart-sdk\bin'
@@ -204,6 +210,9 @@ $previousPubCache = $env:PUB_CACHE
 $env:PUB_CACHE = $pubCacheRoot
 try {
     & $dartExe pub global activate $PackageName --overwrite
+    if ($LASTEXITCODE -ne 0) {
+        Fail 'Package activation failed. Check the Dart/pub error above and retry.'
+    }
 } finally {
     if ($null -eq $previousPubCache) {
         Remove-Item Env:PUB_CACHE -ErrorAction SilentlyContinue
@@ -218,6 +227,9 @@ if (-not (Test-Path $klasCommand)) {
 }
 
 & $klasCommand --help | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    Fail 'Installed CLI failed its help check. Check the Dart error above and retry.'
+}
 Write-Log 'Installation complete'
 
 Start-Login -KlasCommand $klasCommand
