@@ -62,6 +62,35 @@ Error responses replace `data` with `null` and include an `error` object:
 - `auth login --stdin-json` rejects empty strings and control characters in `id` and `password`.
 - `--fields` only accepts comma-separated top-level field names using lowercase letters, digits, and underscores.
 
+## Course detail payloads
+
+`notices show <board_no> --course <course>` returns the same normalized notice fields as `notices list`, plus `content_html`, `content_text`, and `attachments`. The exact course is required because board numbers are scoped to a course. A missing notice returns `NOTICE_NOT_FOUND` with exit code `66`.
+
+`tasks show <task_no> [--course <course>]` preserves `report_html`, `report_title`, and `submission_text`, and adds `report_text`, `attachments` (instructor files), and `submission_attachments` (the student's submitted files). Reuse the exact `course_id` from the list; a number shared across courses returns `AMBIGUOUS_INPUT` without a course filter.
+
+The body text is derived from the editor HTML with paragraphs, breaks, list items, code indentation, and link destinations retained. The original HTML is also available for consumers that need full formatting. No scripts are executed. Attachment content is downloaded as bytes; the CLI does not extract text from PDFs, images, archives, or other files.
+
+Each attachment is normalized as:
+
+```json
+{
+  "file_name": "instructions.pdf",
+  "size_bytes": 1234,
+  "local_path": null
+}
+```
+
+- `file_name` and `size_bytes` can be null if KLAS omits that metadata.
+- Detail attachment lists are empty when no reference exists, or when no files were returned; a reference that resolves to no files also produces a warning.
+- A null attachment list means unavailable because listing failed, or because a notice reports files without supplying their attachment reference. Both cases include a warning. List commands leave bodies and attachment lists null because they do not load details.
+- Without `--download-dir`, `local_path` is null and no bytes are downloaded.
+- With `--download-dir <directory>`, successful downloads have an absolute `local_path` beneath a unique `klas-...` child directory. Instructor and submission files occupy separate subdirectories, and sanitized names receive a number prefix. Existing files are preserved.
+- Listing or download failures retain a successful body response with sanitized `warnings`. Download warnings identify the attachment group and its one-based position. A failed download leaves that file's `local_path` null. Check warnings and paths before assuming all attachments were saved.
+- `--dry-run` validates the arguments without touching KLAS or creating directories. It does not check destination permissions or attachment availability.
+- `--fields` filters the response only; it does not suppress the requested download side effect.
+
+Private downloaded attachments should stay outside version control. No file identifiers, raw upstream records, or session material are exposed in attachment objects.
+
 ## Stable error codes in v1
 
 - `AUTH_REQUIRED`
@@ -70,6 +99,7 @@ Error responses replace `data` with `null` and include an `error` object:
 - `NETWORK_ERROR`
 - `COURSE_NOT_FOUND`
 - `TASK_NOT_FOUND`
+- `NOTICE_NOT_FOUND`
 - `AMBIGUOUS_INPUT`
 - `USAGE_ERROR`
 - `UNSUPPORTED_FEATURE`

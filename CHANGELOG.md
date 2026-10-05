@@ -1,3 +1,11 @@
+## 1.1.0 (Unreleased)
+
+- Add course-scoped `notices show` with notice bodies in text and JSON.
+- Show task instructions and separate instructor/submission attachment lists in `tasks show`.
+- Add `--download-dir` to both detail commands for authenticated attachment downloads with safe filenames and preserved existing files.
+- Report attachment failures as sanitized warnings while retaining readable bodies and successful downloads.
+- Update runtime schema, command help, usage docs, and agent guidance for the detail workflow.
+
 ## 1.0.0
 
 - Freeze the shipped command surface and `schema` output as the stable public contract.

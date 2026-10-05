@@ -12,7 +12,7 @@ Release flow assumption: `develop` is the integration branch, short-lived branch
 ## 2) Contract and docs consistency
 
 - Verify `README.md` command examples match actual behavior.
-- Verify the frozen `1.0.0` reduced surface matches runtime discovery (`dart run bin/klas.dart --help` and `klas schema ...`), and that deferred commands remain unshipped: `tasks due`, `tasks overdue`, `notices show`, `progress`, `files`.
+- Verify the current surface matches runtime discovery (`dart run bin/klas.dart --help` and `klas schema ...`), including `notices show` and the detail commands' `--download-dir` option. Deferred standalone commands remain unshipped: `tasks due`, `tasks overdue`, `progress`, `files`.
 - Verify `doc/json-contract.md` matches the current envelope and error shape.
 - Add release notes to `CHANGELOG.md`.
 

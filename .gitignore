@@ -4,3 +4,6 @@
 build/
 .sisyphus/
 .upstream/
+
+# Private attachments saved by the README examples.
+/downloads/

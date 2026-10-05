@@ -39,25 +39,26 @@ If the upstream capability is incomplete, either:
 
 ## Command design contract
 
-The shipped `1.0.0` command tree is:
+The current command tree, including the body and attachment extension after `1.0.0`, is:
 
 - `klas auth login|status|logout`
 - `klas me profile`
 - `klas courses list|show`
 - `klas tasks list|show`
-- `klas notices list`
+- `klas notices list|show`
 - `klas timetable week`
 - `klas calendar month`
 - `klas schema [command ...]`
 
-### Not in 1.0.0
+`tasks show` and `notices show` support `--download-dir` for attachment saving. Notice detail requires `--course`.
 
-The following commands are explicitly deferred (non-goals) for `1.0.0` and must not
+### Deferred commands
+
+The following commands are explicitly deferred and must not
 be listed as shipped until they are implemented and verified against `klasflow`:
 
 - `klas tasks due`
 - `klas tasks overdue`
-- `klas notices show`
 - `klas progress ...`
 - `klas files ...`
 
@@ -105,6 +106,7 @@ Use stable string codes such as:
 - `NETWORK_ERROR`
 - `COURSE_NOT_FOUND`
 - `TASK_NOT_FOUND`
+- `NOTICE_NOT_FOUND`
 - `AMBIGUOUS_INPUT`
 - `USAGE_ERROR`
 - `UNSUPPORTED_FEATURE`
