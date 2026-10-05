@@ -164,6 +164,8 @@ const Map<String, CommandContract> commandContracts = <String, CommandContract>{
     ],
     notes: <String>[
       'This command writes local auth state, so `--dry-run` is not supported.',
+      'Interactive text login displays numeric captcha images when required, with up to three answers and blank input to cancel.',
+      'JSON output and `--stdin-json` do not prompt; a required captcha returns AUTH_CAPTCHA_REQUIRED (exit 65).',
     ],
   ),
   'auth status': CommandContract(

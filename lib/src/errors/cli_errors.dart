@@ -46,9 +46,11 @@ final class ErrorMapper {
     if (error is InvalidCredentialsException) {
       return const CliException(
         code: 'AUTH_INVALID_CREDENTIALS',
-        message: 'Authentication failed. The provided credentials were rejected.',
+        message:
+            'Authentication failed. The provided credentials were rejected.',
         exitCode: ExitCodes.auth,
-        hint: 'Check KLAS_ID/KLAS_PASSWORD or run `klas auth login` interactively.',
+        hint:
+            'Check KLAS_ID/KLAS_PASSWORD or run `klas auth login` interactively.',
       );
     }
     if (error is SessionExpiredException) {
@@ -56,21 +58,25 @@ final class ErrorMapper {
         code: 'AUTH_EXPIRED',
         message: 'The KLAS session expired and could not be reused.',
         exitCode: ExitCodes.auth,
-        hint: 'Set KLAS_ID/KLAS_PASSWORD for automatic re-login or run `klas auth login`.',
+        hint:
+            'Set KLAS_ID/KLAS_PASSWORD for automatic re-login or run `klas auth login`.',
       );
     }
     if (error is CaptchaRequiredException) {
       return const CliException(
-        code: 'AUTH_REQUIRED',
-        message: 'Interactive login is required because KLAS requested a captcha challenge.',
+        code: 'AUTH_CAPTCHA_REQUIRED',
+        message:
+            'Interactive login is required because KLAS requested a captcha challenge.',
         exitCode: ExitCodes.auth,
-        hint: 'Run `klas auth login` in a terminal session.',
+        hint:
+            'Run `klas auth login` in an interactive terminal with text output, then enter the digits from the captcha image.',
       );
     }
     if (error is OtpRequiredException) {
       return const CliException(
         code: 'AUTH_REQUIRED',
-        message: 'Interactive login is required because KLAS requested an OTP challenge.',
+        message:
+            'Interactive login is required because KLAS requested an OTP challenge.',
         exitCode: ExitCodes.auth,
         hint: 'Run `klas auth login` in a terminal session.',
       );
@@ -78,10 +84,12 @@ final class ErrorMapper {
     if (error is NetworkException || error is ServiceUnavailableException) {
       return const CliException(
         code: 'NETWORK_ERROR',
-        message: 'A network or KLAS service error occurred while processing the request.',
+        message:
+            'A network or KLAS service error occurred while processing the request.',
         exitCode: ExitCodes.network,
         retryable: true,
-        hint: 'Try again in a moment. If the problem persists, check network access to KLAS.',
+        hint:
+            'Try again in a moment. If the problem persists, check network access to KLAS.',
       );
     }
     if (error is ParsingException) {
@@ -94,9 +102,11 @@ final class ErrorMapper {
     }
     return const CliException(
       code: 'INTERNAL_ERROR',
-      message: 'An unexpected internal error occurred while processing the command.',
+      message:
+          'An unexpected internal error occurred while processing the command.',
       exitCode: ExitCodes.software,
-      hint: 'Run the command again. If the problem persists, inspect the environment or update the CLI.',
+      hint:
+          'Run the command again. If the problem persists, inspect the environment or update the CLI.',
     );
   }
 }

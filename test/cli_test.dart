@@ -566,11 +566,13 @@ void main() {
   });
 
   test('auth login forwards stdin-json flag to service', () async {
-    final terminal = FakeTerminal();
+    final terminal = FakeTerminal(canPrompt: true);
     var usedStdinJson = false;
+    var allowedPrompt = true;
     final service = FakeKlasService(
       loginHandler: ({required allowPrompt, required useStdinJson}) async {
         usedStdinJson = useStdinJson;
+        allowedPrompt = allowPrompt;
         return const CommandPayload<AuthLoginView>(
           data: AuthLoginView(
             authenticated: true,
@@ -590,12 +592,15 @@ void main() {
 
     expect(exitCode, ExitCodes.success);
     expect(usedStdinJson, isTrue);
+    expect(allowedPrompt, isFalse);
   });
 }
 
 final class FakeTerminal implements Terminal {
+  FakeTerminal({this.canPrompt = false});
+
   @override
-  bool get canPrompt => false;
+  final bool canPrompt;
 
   final List<String> outLines = <String>[];
   final List<String> errLines = <String>[];

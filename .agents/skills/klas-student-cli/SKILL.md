@@ -57,6 +57,8 @@ export KLAS_PASSWORD="<password>"
 
 If neither local session nor environment variables are available and the user is in an interactive terminal, `klas` can prompt for credentials in text mode. Do not expect prompt-driven auth in JSON automation.
 
+If a JSON command returns `AUTH_CAPTCHA_REQUIRED` (exit code 65), ask the human to run `klas auth login` in an interactive terminal with text output. The CLI opens the current captcha image and accepts the digits, including leading zeros. Let the human provide the answer; do not guess or automatically solve the captcha. After successful login, retry the original JSON command. Captcha cancellation and retry exhaustion preserve saved credentials. `--stdin-json`, JSON output, and `auth status` do not open images or prompt for captcha.
+
 ## Default rule
 
 Prefer `--format json` for any agent workflow.

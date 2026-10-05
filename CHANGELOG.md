@@ -1,5 +1,8 @@
 ## 1.1.0 (Unreleased)
 
+- Continue interactive text logins through numeric captcha using the `klasflow` 1.3.0 challenge callback. Open temporary images, preserve leading zeros, refresh rejected answers up to three times, and clean up images after input.
+- Add `AUTH_CAPTCHA_REQUIRED` for captcha requests, cancellation, or retry exhaustion. JSON/stdin JSON and noninteractive commands remain prompt-free, and captcha errors preserve stored auth.
+
 - Add course-scoped `notices show` with notice bodies in text and JSON.
 - Show task instructions and separate instructor/submission attachment lists in `tasks show`.
 - Add `--download-dir` to both detail commands for authenticated attachment downloads with safe filenames and preserved existing files.
