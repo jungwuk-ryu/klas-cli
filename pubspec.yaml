@@ -23,7 +23,7 @@ dependency_overrides:
   klasflow:
     git:
       url: https://github.com/jungwuk-ryu/klas-flow.git
-      ref: 7b1dadf4e0b9bdf75ccf3badaa52bf31a883ef22
+      ref: 9ababd093d15c486c7ba2f1354e77bbfc6c74702
 
 dev_dependencies:
   lints: ^6.0.0

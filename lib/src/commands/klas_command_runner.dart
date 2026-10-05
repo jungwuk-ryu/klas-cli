@@ -798,7 +798,8 @@ final class CalendarMonthCommand extends KlasCommand<List<ScheduleView>> {
   String get name => 'month';
 
   @override
-  String get description => 'Show monthly schedule table items.';
+  String get description =>
+      'Show monthly calendar events with their full start/end times.';
 
   @override
   void validateInputs() {
@@ -906,5 +907,8 @@ String _renderScheduleList(List<ScheduleView> items, {required String empty}) {
 }
 
 String _renderSchedule(ScheduleView item) {
-  return '${item.title} | kind=${item.kind.value} | day=${item.dayOfWeek ?? '-'} | start=${item.startsAt ?? '-'} | room=${item.classroom ?? '-'} | status=${item.status ?? '-'}';
+  final end = item.kind == ScheduleKind.calendarEvent
+      ? ' | end=${item.endsAt ?? '-'}'
+      : '';
+  return '${item.title} | kind=${item.kind.value} | day=${item.dayOfWeek ?? '-'} | start=${item.startsAt ?? '-'}$end | room=${item.classroom ?? '-'} | status=${item.status ?? '-'}';
 }

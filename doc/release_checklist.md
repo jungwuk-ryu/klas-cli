@@ -19,7 +19,7 @@ Release flow assumption: `develop` is the integration branch, short-lived branch
 ## 3) Packaging and installation
 
 - Ensure `pubspec.yaml` version is updated for release.
-- Publish `klasflow` 1.3.0 with the captcha callback before releasing this CLI. Remove its Git entry from `dependency_overrides` in `pubspec.yaml` and any local `pubspec_overrides.yaml`, run `dart pub get`, and verify that `pubspec.lock` resolves `klasflow` from pub.dev. Rerun the full gate with that hosted version. The development Git pin verifies source checkouts and CI; publish dry-run's override hint does not confirm hosted release readiness.
+- Publish `klasflow` 1.3.0 with the captcha callback and monthly calendar correction before releasing this CLI. Remove its Git entry from `dependency_overrides` in `pubspec.yaml` and any local `pubspec_overrides.yaml`, run `dart pub get`, and verify that `pubspec.lock` resolves `klasflow` from pub.dev. Rerun the full gate with that hosted version. The development Git pin verifies source checkouts and CI; publish dry-run's override hint does not confirm hosted release readiness.
 - Ensure installer contract tests and publish dry-run are included in your release verification path.
   - Covered by `dart run tool/check_all.dart`.
   - For debugging, run `dart test test/installers/install_contract_test.dart` and `dart pub publish --dry-run` directly.

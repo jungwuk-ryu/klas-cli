@@ -465,7 +465,8 @@ const Map<String, CommandContract> commandContracts = <String, CommandContract>{
   ),
   'calendar month': CommandContract(
     path: 'calendar month',
-    description: 'Show monthly schedule table items.',
+    description:
+        'Show monthly calendar events with their full start/end times.',
     authRequired: true,
     supportsDryRun: true,
     supportsFields: true,
@@ -493,6 +494,11 @@ const Map<String, CommandContract> commandContracts = <String, CommandContract>{
         type: 'integer',
         description: 'Calendar month number from 1 to 12.',
       ),
+    ],
+    notes: <String>[
+      'Includes calendar events overlapping the selected month.',
+      'starts_at and ends_at keep the original full period across month boundaries.',
+      'Unknown dates remain null; date-only values use midnight.',
     ],
   ),
 };
